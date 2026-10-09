@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blank canvas</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;background:#111}
+canvas{display:block;width:100vw;height:100dvh;touch-action:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(function(){
+var cv=document.getElementById('c'),ctx=cv.getContext('2d');
+var dpr=1,W=0,H=0,touches=new Map(),frames=0,fps=0,last=performance.now(),safeTop=0;
+var probe=document.createElement('div');
+probe.style.cssText='position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden';
+document.body.appendChild(probe);
+function resize(){
+  dpr=window.devicePixelRatio||1;
+  W=cv.clientWidth;H=cv.clientHeight;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  safeTop=probe.offsetHeight||0;
+}
+window.addEventListener('resize',resize);
+window.addEventListener('orientationchange',function(){setTimeout(resize,100)});
+resize();
+function pos(e){var r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+cv.addEventListener('pointerdown',function(e){e.preventDefault();try{cv.setPointerCapture(e.pointerId)}catch(_){}touches.set(e.pointerId,pos(e))});
+cv.addEventListener('pointermove',function(e){if(touches.has(e.pointerId))touches.set(e.pointerId,pos(e))});
+['pointerup','pointercancel'].forEach(function(t){cv.addEventListener(t,function(e){touches.delete(e.pointerId)})});
+document.addEventListener('contextmenu',function(e){e.preventDefault()});
+function frame(now){
+  frames++;
+  if(now-last>=500){fps=Math.round(frames*1000/(now-last));frames=0;last=now}
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#111';ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  touches.forEach(function(p,id){
+    ctx.beginPath();ctx.arc(p.x,p.y,30,0,Math.PI*2);
+    ctx.fillStyle='hsla('+((id*67)%360)+',80%,60%,0.8)';ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.fillText(String(id),p.x,p.y);
+  });
+  ctx.textAlign='left';ctx.textBaseline='top';ctx.fillStyle='#9f9';ctx.font='12px monospace';
+  ctx.fillText(W+'x'+H+' @'+dpr,8,safeTop+8);
+  ctx.fillText('FPS '+fps,8,safeTop+24);
+  ctx.fillText('touches '+touches.size,8,safeTop+40);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
