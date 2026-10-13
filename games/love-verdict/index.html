@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f12">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>오늘의 연애판결</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0e0f12; --card:#17181c; --card2:#1f2025; --line:#2a2c33;
+  --fg:#f2f3f5; --mut:#9a9ca3; --dim:#6b6e76;
+  --ac:#6c7cff; --ac-soft:rgba(108,124,255,.16); --ac-fill:rgba(108,124,255,.38);
+  --r:18px;
+  --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom);
+  --dur:250ms; --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+.app{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;
+  padding:var(--sat) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+
+/* ── header ── */
+.hdr{flex:none;padding:12px 20px 0}
+.hdr-row{display:flex;align-items:center;justify-content:space-between;height:40px}
+.hdr h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.4px}
+.icon-btn{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;color:var(--mut)}
+.icon-btn:active{background:var(--card2)}
+.subrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;min-height:34px}
+.feedtabs{display:flex;gap:6px}
+.feedtabs button{height:32px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:600;color:var(--mut);background:transparent;border:1px solid var(--line);white-space:nowrap}
+.feedtabs button[aria-selected="true"]{color:var(--fg);background:var(--card2);border-color:#3a3d46}
+.daily{margin-top:6px;font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.daily b{color:var(--fg);font-weight:700}
+
+/* ── views ── */
+.views{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;display:none}
+.view.on{display:flex;flex-direction:column}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:8px 20px 24px}
+
+/* ── home / feed ── */
+.stage{position:relative;flex:1;min-height:0;margin:12px 16px 0;overflow:hidden;touch-action:none;border-radius:var(--r)}
+.card{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--card);border-radius:var(--r);
+  padding:20px 20px 16px;will-change:transform;user-select:none;-webkit-user-select:none;overflow:hidden}
+.card::after{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--ac);opacity:0;pointer-events:none}
+.card.pulse{animation:pulse 260ms var(--ease)}
+.card.pulse::after{animation:flash 260ms var(--ease)}
+@keyframes pulse{50%{transform:scale(.985)}}
+@keyframes flash{30%{opacity:.10}100%{opacity:0}}
+.card-top{display:flex;align-items:center;gap:8px;min-height:26px}
+.chip{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:8px;background:var(--card2);color:var(--mut);font-size:12.5px;font-weight:600}
+.chip.mine{color:var(--ac);background:var(--ac-soft)}
+.title{margin:14px 0 10px;font-size:21px;line-height:1.35;font-weight:800;letter-spacing:-.4px;word-break:keep-all}
+.body{margin:0;font-size:17px;line-height:1.55;color:#d6d8dd;word-break:keep-all;overflow:hidden}
+.card.voted .body{color:var(--mut);font-size:15px}
+.card.followed .body{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.grow{flex:1 1 12px;min-height:12px}
+.q{margin:0 0 12px;font-size:17px;font-weight:700;line-height:1.4;word-break:keep-all}
+.q small{display:block;font-size:12.5px;font-weight:500;color:var(--mut);margin-top:2px}
+.actions{display:flex;flex-direction:column;gap:10px}
+.vbtn{min-height:58px;padding:10px 16px;border-radius:14px;font-size:16.5px;font-weight:700;line-height:1.3;text-align:center;word-break:keep-all;
+  background:var(--card2);border:1px solid #30323a;transition:transform 120ms var(--ease),background 120ms}
+.vbtn.primary{background:var(--ac);border-color:var(--ac);color:#fff}
+.vbtn:active,.vbtn.pressed{transform:scale(.96)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fgrid .vbtn{min-height:50px;font-size:15px;padding:8px 10px}
+
+/* results */
+.res{display:flex;flex-direction:column;gap:8px}
+.res-meta{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--mut);margin-bottom:2px}
+.res-meta b{color:var(--fg);font-weight:700}
+.row{position:relative;min-height:48px;border-radius:12px;background:var(--card2);overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px}
+.row .fill{position:absolute;inset:0;background:#2c2e36;transform-origin:left center;transform:scaleX(0);transition:transform 420ms var(--ease)}
+.row.mine{box-shadow:inset 0 0 0 1.5px var(--ac)}
+.row.mine .fill{background:var(--ac-fill)}
+.row .lbl,.row .pct{position:relative;z-index:1}
+.row .lbl{font-size:15px;font-weight:600;line-height:1.3;word-break:keep-all}
+.row .pct{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.row.mine .pct{color:#c9cfff}
+.badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;font-size:11px;font-weight:700;background:var(--fg);color:var(--bg);vertical-align:2px}
+.minor{margin:2px 0 0;font-size:13px;color:var(--ac);font-weight:600}
+.compact .row{min-height:40px;padding:6px 12px}
+.compact .row .lbl{font-size:14px}
+.compact .row .pct{font-size:14.5px}
+.follow{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.slidein{animation:slidein 240ms var(--ease) both}
+@keyframes slidein{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.fade{animation:fade 200ms var(--ease) both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* ad / end */
+.card.ad{background:transparent;border:1.5px dashed #3a3d46;align-items:center;justify-content:center;text-align:center;gap:10px}
+.ad-tag{position:absolute;top:16px;left:16px;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--dim);border:1px solid #3a3d46;border-radius:6px;padding:2px 6px}
+.ad-x{position:absolute;top:8px;right:8px}
+.ad-txt{font-size:18px;font-weight:700;color:var(--mut)}
+.ad-sub{font-size:13px;color:var(--dim)}
+.card.end{align-items:center;justify-content:center;text-align:center;gap:6px}
+.end h2{margin:0;font-size:21px;font-weight:800}
+.end p{margin:0 0 16px;color:var(--mut);font-size:14.5px}
+.pill{height:48px;padding:0 22px;border-radius:999px;background:var(--ac);color:#fff;font-weight:700;font-size:15.5px}
+.pill.ghost{background:var(--card2);color:var(--fg)}
+
+.next-wrap{flex:none;display:flex;justify-content:center;padding:10px 16px 10px}
+.next{height:44px;padding:0 20px;border-radius:999px;color:var(--mut);font-size:14.5px;font-weight:600}
+.next:active{background:var(--card2)}
+
+/* ── write ── */
+.sec-h{margin:12px 0 4px;font-size:22px;font-weight:800;letter-spacing:-.4px}
+.sec-p{margin:0 0 20px;color:var(--mut);font-size:14px}
+.field{margin-bottom:16px}
+.field label{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-bottom:6px;font-weight:600}
+.field label span{font-variant-numeric:tabular-nums;font-weight:500}
+.field input,.field textarea{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font-size:16px;outline:none;resize:none}
+.field textarea{height:150px;line-height:1.55}
+.field input:focus,.field textarea:focus{border-color:var(--ac)}
+.field input::placeholder,.field textarea::placeholder{color:var(--dim)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.submit{width:100%;height:56px;border-radius:14px;background:var(--ac);color:#fff;font-size:16.5px;font-weight:700;margin-top:4px}
+.submit:disabled{background:var(--card2);color:var(--dim)}
+.note{margin:12px 0 0;text-align:center;font-size:12.5px;color:var(--dim)}
+
+/* ── history ── */
+.summary{display:flex;gap:10px;margin:4px 0 16px}
+.stat{flex:1;background:var(--card);border-radius:14px;padding:14px}
+.stat b{display:block;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--mut)}
+.hlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.hitem{width:100%;text-align:left;background:var(--card);border-radius:14px;padding:14px 16px;display:block}
+.hitem:active{background:var(--card2)}
+.hitem h3{margin:0 0 8px;font-size:15.5px;font-weight:700;line-height:1.35;word-break:keep-all}
+.hline{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:var(--mut)}
+.hline b{color:var(--fg);font-weight:600}
+.tag{display:inline-block;margin-top:10px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:7px}
+.tag.ok{background:var(--ac-soft);color:var(--ac)}
+.tag.no{background:#2a2c33;color:#c9cbd1}
+.empty{padding:60px 20px;text-align:center;color:var(--mut);font-size:15px;line-height:1.6}
+
+/* ── tabbar ── */
+.tabbar{flex:none;display:flex;border-top:1px solid #1e2026;background:var(--bg);padding-bottom:var(--sab)}
+.tabbar button{flex:1;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--dim)}
+.tabbar button[aria-selected="true"]{color:var(--fg)}
+.tabbar svg{width:22px;height:22px}
+
+/* ── toast / sheet / overlay ── */
+.toast{position:fixed;left:50%;top:calc(var(--sat) + 60px);transform:translate(-50%,-10px);opacity:0;max-width:calc(100% - 40px);
+  background:#f2f3f5;color:#111;font-size:14.5px;font-weight:700;padding:12px 18px;border-radius:14px;text-align:center;
+  transition:opacity 200ms,transform 200ms var(--ease);pointer-events:none;z-index:50;word-break:keep-all}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;transition:opacity 200ms;z-index:40;display:none}
+.scrim.show{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--card);border-radius:22px 22px 0 0;padding:10px 20px calc(var(--sab) + 20px);
+  transform:translateY(100%);transition:transform 240ms var(--ease);display:none}
+.sheet.show{transform:none}
+.grab{width:36px;height:4px;border-radius:2px;background:#3a3d46;margin:0 auto 16px}
+.sheet h2{margin:0 0 14px;font-size:18px;font-weight:800}
+.sheet .summary{margin-bottom:14px}
+.sheet .stat{background:var(--card2)}
+.modal{position:fixed;inset:0;z-index:42;display:none;align-items:center;justify-content:center;padding:24px}
+.modal.show{display:flex}
+.mcard{width:100%;max-width:340px;background:var(--card);border-radius:22px;padding:28px 22px 20px;text-align:center;animation:pop 240ms var(--ease) both}
+@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+.mcard .k{font-size:12.5px;font-weight:700;color:var(--ac);letter-spacing:.5px}
+.mcard h2{margin:10px 0 8px;font-size:22px;line-height:1.35;font-weight:800;word-break:keep-all}
+.mcard p{margin:0 0 20px;color:var(--mut);font-size:14.5px;line-height:1.55;word-break:keep-all}
+.mcard .bars{text-align:left;margin:0 0 20px;display:flex;flex-direction:column;gap:6px}
+.mcard .bars div{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut)}
+.mcard .bars i{flex:1;height:6px;border-radius:3px;background:var(--card2);overflow:hidden;position:relative}
+.mcard .bars i::after{content:"";position:absolute;inset:0;background:var(--ac);transform-origin:left;transform:scaleX(var(--p))}
+.mcard .bars span{width:56px}
+.mcard .pill{width:100%}
+
+@media (max-height:700px){
+  .title{font-size:19px;margin:10px 0 6px}
+  .body{font-size:15.5px}
+  .card{padding:16px 16px 14px}
+  .vbtn{min-height:56px;font-size:15.5px}
+  .card.voted .body{display:none}
+  .card.followed .title{margin-bottom:0}
+  .q{font-size:16px;margin-bottom:8px}
+  .row{min-height:42px}
+  .body{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+  .card.followed .card-top,.card.followed .res-meta,.card.followed .minor{display:none}
+  .card.followed .title{margin-top:0}
+  .card.followed .row{min-height:34px;padding:4px 12px}
+  .card.followed .actions{gap:6px}
+  .follow{margin-top:10px;padding-top:10px}
+  .fgrid .vbtn{min-height:42px;font-size:14px;padding:6px 8px}
+}
+@media (max-height:620px){
+  .body{-webkit-line-clamp:2}
+  .card.voted .card-top,.card.followed .title{display:none}
+  .next-wrap{padding:4px 16px}
+  .next{height:36px}
+}
+@media (max-width:350px){
+  .hdr{padding:10px 14px 0}
+  .feedtabs button{padding:0 9px;font-size:13px}
+  .stage{margin:10px 10px 0}
+  .scroll{padding-left:14px;padding-right:14px}
+  .two{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms!important;transition-duration:1ms!important}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="hdr" id="hdr">
+    <div class="hdr-row">
+      <h1>오늘의 연애판결</h1>
+      <button class="icon-btn" id="profileBtn" aria-label="내 프로필">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg>
+      </button>
+    </div>
+    <div class="subrow" id="homeSub">
+      <div class="feedtabs" role="tablist" id="feedTabs">
+        <button data-feed="hot" aria-selected="true">🔥 인기</button>
+        <button data-feed="new" aria-selected="false">🆕 최신</button>
+        <button data-feed="rand" aria-selected="false">🎲 랜덤</button>
+      </div>
+    </div>
+    <div class="daily" id="daily"></div>
+  </header>
+
+  <main class="views">
+    <section class="view on" id="view-home" aria-label="판결">
+      <div class="stage" id="stage"></div>
+      <div class="next-wrap"><button class="next" id="nextBtn">다음 사연 ↑</button></div>
+    </section>
+
+    <section class="view" id="view-write" aria-label="사연쓰기">
+      <div class="scroll">
+        <h2 class="sec-h">사연쓰기</h2>
+        <p class="sec-p">익명으로 올라가요. 사람들이 3초 안에 판결해 줄 거예요.</p>
+        <form id="writeForm" autocomplete="off">
+          <div class="field"><label for="fTitle">제목 <span data-for="fTitle"></span></label>
+            <input id="fTitle" maxlength="40" placeholder="예) 카톡 답장이 하루에 세 번"></div>
+          <div class="field"><label for="fBody">상황 설명 <span data-for="fBody"></span></label>
+            <textarea id="fBody" maxlength="300" placeholder="무슨 일이 있었는지 2~4문장으로 적어주세요"></textarea></div>
+          <div class="field"><label for="fQ">질문 <span data-for="fQ"></span></label>
+            <input id="fQ" maxlength="50" placeholder="예) 제가 예민한 걸까요?"></div>
+          <div class="two">
+            <div class="field"><label for="fA">선택지 A</label><input id="fA" maxlength="24" placeholder="예) 예민하다"></div>
+            <div class="field"><label for="fB">선택지 B</label><input id="fB" maxlength="24" placeholder="예) 정당하다"></div>
+          </div>
+          <button type="submit" class="submit" id="submitBtn" disabled>익명으로 올리기</button>
+          <p class="note">프로토타입이라 이 기기에만 저장돼요.</p>
+        </form>
+      </div>
+    </section>
+
+    <section class="view" id="view-history" aria-label="내 기록">
+      <div class="scroll" id="historyBox"></div>
+    </section>
+  </main>
+
+  <nav class="tabbar" role="tablist" id="tabbar">
+    <button data-tab="home" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7h14M5 7l-2.5 6a3 3 0 0 0 5 0L5 7zM19 7l-2.5 6a3 3 0 0 0 5 0L19 7zM8 21h8"/></svg>판결</button>
+    <button data-tab="write" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>사연쓰기</button>
+    <button data-tab="history" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r=".6" fill="currentColor"/><circle cx="4" cy="12" r=".6" fill="currentColor"/><circle cx="4" cy="18" r=".6" fill="currentColor"/></svg>내 기록</button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-label="내 판결 현황"></div>
+<div class="modal" id="modal" role="dialog"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
