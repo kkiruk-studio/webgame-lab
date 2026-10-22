@@ -62,15 +62,15 @@
 
   /* 이웃. likes.type: color(색 태그) | slot(슬롯 착용) | dog(강아지 아이템) */
   PG.NEIGHBORS = [
-    { id: 'marta', name: '마르타', role: '꽃집', prop: 'stall', likes: { type: 'color', value: 'blue' },
+    { id: 'marta', name: '마르타', role: '꽃집', prop: 'stall', gesture: 'hat', likes: { type: 'color', value: 'blue' },
       hint: '오늘은 마르타가 꽃을 내놓을 것 같아요. 파란색을 좋아한대요.',
       favLines: ['어머, 오늘 파란색이 참 잘 어울리세요!', '그 파란색… 오늘 들어온 꽃이랑 똑같네요.'],
       lines: ['좋은 아침이에요, 시뇨레.', '오늘도 단정하시네요.'] },
-    { id: 'enzo', name: '엔조', role: '카페 바리스타', prop: 'cafe', likes: { type: 'slot', value: 'hat' },
+    { id: 'enzo', name: '엔조', role: '카페 바리스타', prop: 'cafe', gesture: 'talk', likes: { type: 'slot', value: 'hat' },
       hint: '엔조의 카페가 일찍 문을 연대요. 모자 쓴 신사를 좋아한대요.',
       favLines: ['오늘 모자 멋지네요! 에스프레소 한 잔 하시죠.', '그 모자, 우리 아버지 생각나네요.'],
       lines: ['본조르노! 오늘은 모자를 안 쓰셨네요?', '좋은 아침입니다, 늘 드시던 걸로?'] },
-    { id: 'sofia', name: '소피아', role: '동네 꼬마', prop: null, likes: { type: 'dog' },
+    { id: 'sofia', name: '소피아', role: '동네 꼬마', prop: null, gesture: 'bow', likes: { type: 'dog' },
       hint: '소피아가 학교 가는 길에 지나간대요. {dog}가 멋을 내면 좋아할 거예요.',
       favLines: ['{dog}! 오늘 진짜 멋쟁이다!', '{dog} 목에 그거 뭐예요? 너무 귀여워요!'],
       lines: ['{dog} 안녕! 할아버지도 안녕하세요!', '{dog} 한 번만 쓰다듬어도 돼요?'] },
@@ -93,6 +93,9 @@
     { id: 'f_marta2', cond: { type: 'aff', who: 'marta', min: 3 }, text: '마르타의 가게 앞엔 언제나 파란 꽃 한 다발이 팔리지 않고 남아 있다.' },
     { id: 'f_dog2', source: 'dog', cond: { type: 'dogFree', min: 4 }, text: '강아지의 발견: 낡은 사진 한 장. 같은 벤치, 같은 모자, 그리고 웃고 있는 한 사람.' },
     { id: 'f_promise', cond: { type: 'walks', min: 6 }, text: '산책은 약속이었다. 매일 아침, 가장 멋진 모습으로.' },
+    { id: 'f_alley1', cond: { type: 'route', route: 'alley', min: 2 }, text: '뒷골목 벽에 분필로 그린 하트가 빗물에도 지워지지 않았다.' },
+    { id: 'f_alley_rain', cond: { type: 'alleyRain', min: 1 }, text: '비 오는 뒷골목, 처마 밑에 둘이 서 있던 자리. 그는 잠깐 멈췄다가 걸었다.' },
+    { id: 'f_park1', cond: { type: 'route', route: 'park', min: 2 }, text: '공원 벤치의 동판에 새겨진 이름을 그는 읽지 않고도 안다.' },
   ];
 
   /* 해금 조각이 없는 날의 일상 문장 */
@@ -144,13 +147,15 @@
       case 'dogFree': return (s.dogFree || 0) >= c.min;
       case 'blueDays': return (s.blueGreetDays || 0) >= c.min;
       case 'walks': return (s.day - 1) >= c.min;
+      case 'route': return ((s.routeCounts && s.routeCounts[c.route]) || 0) >= c.min;
+      case 'alleyRain': return (s.alleyRain || 0) >= c.min;
       default: return false;
     }
   };
 
   PG.newSave = function (breed, name) {
     return {
-      v: 1,
+      v: 2,
       dog: { breed: breed, name: name },
       day: 1,
       coins: 30,
@@ -163,7 +168,26 @@
       endingsSeen: [],
       pendingEnding: null,
       lastWalk: null,
+      dogMood: 60,
+      routeCounts: { park: 0, cafe: 0, alley: 0 },
+      alleyRain: 0,
+      gestKnown: {},
     };
+  };
+
+  /* 예전 세이브(v1 등)에 빠진 필드를 기본값으로 채운다. null 이면 그대로 null. */
+  PG.migrate = function (s) {
+    if (!s || typeof s !== 'object') return s || null;
+    const d = PG.newSave((s.dog && s.dog.breed) || 'dachshund', (s.dog && s.dog.name) || 'Bruno');
+    Object.keys(d).forEach((k) => { if (s[k] === undefined) s[k] = d[k]; });
+    s.affinity = Object.assign({}, d.affinity, s.affinity || {});
+    s.routeCounts = Object.assign({}, d.routeCounts, s.routeCounts || {});
+    if (typeof s.dogMood !== 'number' || isNaN(s.dogMood)) s.dogMood = 60;
+    if (!s.gestKnown || typeof s.gestKnown !== 'object') s.gestKnown = {};
+    ['owned', 'unlockedFragments', 'endingsSeen'].forEach((k) => { if (!Array.isArray(s[k])) s[k] = d[k].slice(); });
+    if (!s.equipped || typeof s.equipped !== 'object') s.equipped = Object.assign({}, d.equipped);
+    s.v = 2;
+    return s;
   };
 
   /* 저장소 어댑터. 게임은 이 객체로만 저장에 접근한다.

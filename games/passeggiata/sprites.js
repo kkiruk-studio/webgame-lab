@@ -440,6 +440,13 @@
     sun: { pal: { y: '#e8b83a', Y: '#c8902a' }, rows: ['....y....', '.y.....y.', '...yyy...', '..yyyyy..', 'y.yyYyy.y', '..yyyyy..', '...yyy...', '.y.....y.', '....y....'] },
     cloudi: { pal: { w: '#f2eee4', W: '#b9b4a8' }, rows: ['.........', '...www...', '..wwwww..', '.wwwwwwww', 'wwwwwwwww', 'WWWWWWWWW', '.........'] },
     rain: { pal: { w: '#e4e2dc', W: '#9ea3aa', b: '#6f9fd0' }, rows: ['...www...', '..wwwww..', '.wwwwwwww', 'WWWWWWWWW', '.b..b..b.', 'b..b..b..', '.b..b..b.'] },
+    sign: { pal: { k: '#5a3a22', K: '#3d2716', w: '#efe2c4', a: '#2b211c' },
+      rows: ['kkkkkkkk..', 'kwwwwwwwk.', 'kwaaaawwwk', 'kwwwwwwwk.', 'kkkkkkkk..', '....kK....', '....kK....',
+        '..kkkkkkkk', '.kwwwwwwwk', 'kwwwaaaawk', '.kwwwwwwwk', '..kkkkkkkk', '....kK....', '....kK....', '....kK....',
+        '....kK....', '....kK....', '....kK....', '....kK....', '....kK....', '....kK....', '...KKKK...'] },
+    puddle: { pal: { b: '#7d8fa0', B: '#5f7184', w: '#c9d6e0' }, rows: ['...bbbbbbbb...', '.bbbwwbbbbbbb.', 'bbBbbbbbbwwbbb', '.bbBBBBbbbbbb.'] },
+    pigeon0: { pal: { g: '#8a8f98', G: '#5f646c', p: '#9a7fa8', k: '#2b211c', o: '#d9a441' }, rows: ['.gk...', 'ogggg.', '.gpGGG', '..GGG.', '..o.o.'] },
+    pigeon1: { pal: { g: '#8a8f98', G: '#5f646c', k: '#2b211c', o: '#d9a441' }, rows: ['G....G', 'GG..GG', '.GggG.', 'okggg.', '..g...'] },
     coinicon: { pal: { o: '#e0b23a', O: '#9c7020', w: '#fff3c4', k: '#5a3e14' }, rows: ['..ooo..', '.owwoO.', 'owoooOo', 'owokoOo', 'ooooOOo', '.oOOOO.', '..ooo..'] },
     book: { pal: { r: '#7a2232', R: '#5a1824', w: '#f6efdf', y: '#d9b45a' }, rows: ['rrrrrrrr.', 'rRyyyyRrw', 'rRyRRyRrw', 'rRRRRRRrw', 'rRRRRRRrw', 'rRRyyRRrw', 'rRRRRRRrw', 'rrrrrrrrw', '.wwwwwwww'] },
   };
@@ -448,7 +455,7 @@
     Object.keys(PROPS_DEF).forEach((k) => {
       const d = PROPS_DEF[k];
       const raw = bakeRows(d.rows, d.pal);
-      PROPS[k] = ['cloud', 'spark', 'scent', 'dots'].indexOf(k) >= 0 ? raw : outline(raw);
+      PROPS[k] = ['cloud', 'spark', 'scent', 'dots', 'puddle'].indexOf(k) >= 0 ? raw : outline(raw);
     });
     PROPS.tree = makeTree();
     PROPS.lamp = makeLamp();

@@ -57,9 +57,19 @@ button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;padding:4px 10px;font-size:12px}
 
 /* 걷기 프롬프트 */
-#prompt{position:absolute;right:calc(var(--padR) + 6px);bottom:calc(max(var(--sab),6px) + 8px);padding:8px 16px 10px;min-width:180px;text-align:center;font-weight:800;font-size:15px;pointer-events:none}
-#prompt small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
-#promptBar{height:4px;background:var(--terra);margin-top:6px;width:100%}
+#prompt{position:absolute;right:calc(var(--padR) + 6px);bottom:calc(max(var(--sab),6px) + 8px);padding:8px 16px 10px;min-width:200px;max-width:min(72vw,440px);text-align:center;font-weight:800;font-size:15px;pointer-events:none}
+#prompt small{display:block;font-weight:700;font-size:12px;color:var(--muted);margin-top:2px}
+#promptBar{position:relative;height:6px;background:var(--paper2);border:1px solid var(--ink);margin-top:7px;width:100%}
+#promptBar i{position:absolute;top:0;bottom:0;display:block}
+#pbFill{left:0;width:100%;background:var(--terra)}
+#pbZone{background:var(--olive)}
+#pbMark{top:-4px!important;bottom:-4px!important;width:3px;margin-left:-1px;background:var(--ink)}
+/* 강아지 기분 칩 */
+#moodChip{gap:4px;padding:0 7px}
+#moodBar{display:flex;gap:1px}
+#moodBar i{display:block;width:5px;height:10px;border:1px solid var(--ink)}
+#moodBar i.on{background:var(--olive)}
+#moodChip.low #moodBar i.on{background:var(--terra)}
 
 /* 강아지 선택 */
 #ui-dog .wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(100vw - var(--padL) - var(--padR)),640px);padding:14px 16px;text-align:center}
@@ -108,6 +118,8 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
 .hearts{color:#c8452f;letter-spacing:1px}
 .hearts .off{color:#cdbb97}
 .plus{color:var(--olive);font-weight:800}
+.badge{font-size:9.5px;font-weight:800;background:var(--olive);color:#f6efdf;padding:0 3px;margin-left:3px}
+.minus{color:var(--terra2)}
 .diary{font-size:12.5px;font-style:italic;background:#fff8e6;border-left:3px solid var(--terra);padding:5px 8px;line-height:1.4}
 .resinfo .foot{margin-top:auto}
 
@@ -150,6 +162,7 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
   <div class="chip" id="hudDay">Day 1</div>
   <div class="chip"><img class="px" id="hudCoinImg" alt=""><span id="hudCoins">0</span></div>
   <div id="timewrap" hidden><div id="timebar"></div></div>
+  <div class="chip" id="moodChip" hidden aria-label="강아지 기분"><span aria-hidden="true">🐾</span><span id="moodBar"><i></i><i></i><i></i><i></i></span></div>
   <div class="spacer"></div>
   <button class="btn" id="bookBtn" aria-label="엔딩 도감"><img class="px" id="bookImg" alt=""></button>
 </div>
@@ -184,7 +197,7 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
 </div>
 
 <div class="ui" data-scene="walk" id="ui-walk" hidden>
-  <div id="prompt" class="panel" hidden><span id="promptText">인사하기</span><small>화면 아무 곳이나 탭</small><div id="promptBar"></div></div>
+  <div id="prompt" class="panel" hidden><span id="promptText">인사하기</span><small id="promptSub"></small><div id="promptBar"><i id="pbFill"></i><i id="pbZone"></i><i id="pbMark"></i></div></div>
 </div>
 
 <div class="ui" data-scene="result" id="ui-result" hidden>
@@ -196,7 +209,10 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
         <div class="row"><span>길에서 주운 코인</span><b id="rPick">0</b></div>
         <div class="row"><span>강아지의 발견</span><b id="rFind">0</b></div>
         <div class="row"><span>코디 보너스 <span class="stars" id="rStars"></span></span><b id="rBonus">0</b></div>
+        <div class="row minus" id="rDirtRow" hidden><span>옷 더러워짐</span><b id="rDirt">−0★</b></div>
         <div class="row total"><span>오늘 번 코인</span><b id="rTotal">0</b></div>
+        <div class="row" id="rRouteRow" hidden><span>경로</span><b id="rRoute"></b></div>
+        <div class="row" id="rMoodRow" hidden><span>강아지 기분</span><b id="rMood"></b></div>
       </div>
       <div class="nbrs" id="rNbrs"></div>
       <div class="diary" id="rDiary"></div>
