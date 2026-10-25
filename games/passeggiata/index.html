@@ -105,6 +105,28 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
 #gearBtn{position:absolute;left:var(--padL);bottom:calc(max(var(--sab),6px) + 4px);width:26px;height:26px;padding:0;font-size:14px;opacity:.75;background:rgba(244,234,213,.85);border:2px solid var(--ink)}
 #gearMenu{position:absolute;left:var(--padL);bottom:calc(max(var(--sab),6px) + 36px);padding:8px;display:flex;flex-direction:column;gap:5px;z-index:9}
 
+/* 옷장: 점수 내역 · 테마 · 동네 소식 · 기억 */
+.scorerow{display:flex;gap:4px;flex-wrap:wrap}
+.chip.mini{height:18px;padding:0 6px;font-size:10.5px;border-width:1px;gap:3px}
+.chip.mini.ok{background:#eef0d8}
+.theme{font-size:10.5px;font-weight:700;color:var(--terra2);border:1px solid var(--terra2);padding:0 4px;white-space:nowrap}
+.news{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-2px}
+.mem{color:var(--terra2);font-style:italic}
+
+/* 호감 이벤트 대화 */
+#dlg{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(var(--sab),6px) + 8px);width:min(78vw,520px);padding:8px 14px 9px;z-index:6}
+#dlg b{display:block;font-size:12px;color:var(--terra2)}
+#dlgText{display:block;font-size:14px;font-weight:600;min-height:1.4em;margin-top:2px}
+#dlg small{display:block;text-align:right;font-size:10px;color:var(--muted);animation:blink 1.4s steps(2) infinite}
+#streakBadge{margin-left:2px}
+
+/* 모의 광고 */
+#adWrap{position:absolute;inset:0;z-index:20;background:rgba(43,33,28,.62);display:flex;align-items:center;justify-content:center}
+#adCard{width:min(80vw,420px);padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px;text-align:center}
+#adCard .adlab{align-self:flex-start;font-size:10px;font-weight:800;background:var(--muted);color:#f6efdf;padding:1px 5px}
+#adCard .adbox{border:2px dashed var(--muted);background:var(--paper2);padding:18px 8px;font-weight:700;color:var(--muted)}
+#adCount{font-size:12px;color:var(--muted)}
+
 /* 결산 */
 #resPanel{position:absolute;top:calc(var(--sat) + 40px);bottom:calc(max(var(--sab),6px) + 4px);left:var(--padL);right:var(--padR);padding:8px 10px;display:flex;gap:12px}
 .shot{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:center;min-width:0}
@@ -162,7 +184,7 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
   <div class="chip" id="hudDay">Day 1</div>
   <div class="chip"><img class="px" id="hudCoinImg" alt=""><span id="hudCoins">0</span></div>
   <div id="timewrap" hidden><div id="timebar"></div></div>
-  <div class="chip" id="moodChip" hidden aria-label="강아지 기분"><span aria-hidden="true">🐾</span><span id="moodBar"><i></i><i></i><i></i><i></i></span></div>
+  <div class="chip" id="moodChip" hidden aria-label="강아지 기분"><span aria-hidden="true">🐾</span><span id="moodBar"><i></i><i></i><i></i><i></i></span><span class="badge" id="streakBadge" hidden>×2</span></div>
   <div class="spacer"></div>
   <button class="btn" id="bookBtn" aria-label="엔딩 도감"><img class="px" id="bookImg" alt=""></button>
 </div>
@@ -182,8 +204,10 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
 
 <div class="ui" data-scene="wardrobe" id="ui-wardrobe" hidden>
   <div id="wardPanel" class="panel">
-    <div class="inforow"><img class="px" id="wIcon" alt=""><span id="wWeather">맑음</span><span style="color:var(--muted);font-weight:600">· 오늘의 코디</span><span class="stars" id="wStars"></span></div>
+    <div class="inforow"><img class="px" id="wIcon" alt=""><span id="wWeather">맑음</span><span class="theme" id="wTheme"></span><span style="color:var(--muted);font-weight:600">· 오늘의 코디</span><span class="stars" id="wStars"></span></div>
+    <div class="scorerow" id="wScore"></div>
     <div class="hint" id="wHint"></div>
+    <div class="news" id="wNews"></div>
     <div class="tabs" id="wTabs"></div>
     <div class="grid" id="wGrid"></div>
     <div class="foot"><span id="wDesc" style="font-size:11px;color:var(--muted);flex:1;min-width:0"></span><button class="btn" id="wShop">상점</button><button class="btn primary" id="wGo">산책 나가기</button></div>
@@ -198,6 +222,7 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
 
 <div class="ui" data-scene="walk" id="ui-walk" hidden>
   <div id="prompt" class="panel" hidden><span id="promptText">인사하기</span><small id="promptSub"></small><div id="promptBar"><i id="pbFill"></i><i id="pbZone"></i><i id="pbMark"></i></div></div>
+  <div id="dlg" class="panel" hidden><b id="dlgName"></b><span id="dlgText"></span><small>탭하여 계속</small></div>
 </div>
 
 <div class="ui" data-scene="result" id="ui-result" hidden>
@@ -216,7 +241,15 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
       </div>
       <div class="nbrs" id="rNbrs"></div>
       <div class="diary" id="rDiary"></div>
-      <div class="foot"><button class="btn" id="rShop">상점</button><button class="btn primary" id="rNext">내일 산책</button></div>
+      <div class="foot"><button class="btn terra" id="rEve" hidden>저녁 산책 (광고 보기)</button><span class="spacer"></span><button class="btn" id="rShop">상점</button><button class="btn primary" id="rNext">내일 산책</button></div>
+    </div>
+  </div>
+  <div id="adWrap" hidden>
+    <div id="adCard" class="panel">
+      <span class="adlab">모의 광고 · 실제 광고 아님</span>
+      <div class="adbox">여기에 광고가 재생됩니다</div>
+      <div id="adCount">3초 후 닫을 수 있어요</div>
+      <button class="btn primary" id="adClose" disabled>닫기</button>
     </div>
   </div>
 </div>

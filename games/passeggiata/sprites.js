@@ -413,6 +413,8 @@
     dots: { pal: { k: '#2b211c' }, rows: ['k.k.k'] },
     heart: { pal: { r: '#c8452f', w: '#f6efdf', R: '#9c2f20' }, rows: ['.rr.rr.', 'rwrrrrr', 'rrrrrrR', '.rrrrR.', '..rrR..', '...R...'] },
     sheart: { pal: { r: '#c8452f', R: '#9c2f20' }, rows: ['rr.rr', 'rrrrR', '.rrR.', '..R..'] },
+    dust0: { pal: { w: '#efe4cc', W: '#cdbb97' }, rows: ['..ww..', '.wWWw.', 'wWwwWw'] },
+    dust1: { pal: { w: '#efe4cc', W: '#cdbb97' }, rows: ['w....w', '.W..W.', 'w.ww.w'] },
     scent: { pal: { g: '#7c8a52' }, rows: ['.g...', '..g..', '.g..g', '..g.g', '...g.', '..g..'] },
     cloud: { pal: { w: '#fbf6ea', W: '#e4dccb' }, rows: ['........wwww..............', '....wwwwwwwwww...www......',
       '..wwwwwwwwwwwwwwwwwwww....', '.wwwwwwwwwwwwwwwwwwwwwww..', 'wwwwwwwwwwwwwwwwwwwwwwwwww', '.WWWWWWWWWWWWWWWWWWWWWWW..'] },
@@ -455,7 +457,7 @@
     Object.keys(PROPS_DEF).forEach((k) => {
       const d = PROPS_DEF[k];
       const raw = bakeRows(d.rows, d.pal);
-      PROPS[k] = ['cloud', 'spark', 'scent', 'dots', 'puddle'].indexOf(k) >= 0 ? raw : outline(raw);
+      PROPS[k] = ['cloud', 'spark', 'scent', 'dots', 'puddle', 'dust0', 'dust1'].indexOf(k) >= 0 ? raw : outline(raw);
     });
     PROPS.tree = makeTree();
     PROPS.lamp = makeLamp();

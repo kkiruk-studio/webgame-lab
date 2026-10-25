@@ -13,45 +13,49 @@
   /* 아이템. pal = 스프라이트 레이어 색(sprites.js 의 의미 문자에 대응).
      weather = 날씨 적합 보너스, color = 색 태그(이웃 취향 판정). */
   PG.ITEMS = [
-    { id: 'shirt_white', slot: 'shirt', name: '흰 셔츠', price: 0, style: 1, color: 'white', starter: true,
+    { id: 'shirt_white', memory: '결혼식 날 아침에도 흰 셔츠였다. 단추는 그녀가 채웠다.', slot: 'shirt', name: '흰 셔츠', price: 0, style: 1, color: 'white', starter: true,
       pal: { T: '#e8e4d8', A: '#f7f4ec', a: '#c4beaf', C: '#ffffff' } },
-    { id: 'pants_grey', slot: 'pants', name: '회색 바지', price: 0, style: 1, color: 'grey', starter: true,
+    { id: 'pants_grey', memory: '무릎이 조금 닳았다. 둘이 정원에 쪼그려 앉던 자리.', slot: 'pants', name: '회색 바지', price: 0, style: 1, color: 'grey', starter: true,
       pal: { L: '#737882', l: '#555a63', B: '#2f2a26' } },
-    { id: 'shoes_brown', slot: 'shoes', name: '갈색 구두', price: 0, style: 1, color: 'brown', starter: true,
+    { id: 'shoes_brown', memory: '일요일마다 그녀와 신문지를 깔고 함께 닦던 구두.', slot: 'shoes', name: '갈색 구두', price: 0, style: 1, color: 'brown', starter: true,
       pal: { F: '#7a4a2a', f: '#55321c', q: '#241812' } },
 
-    { id: 'hat_panama', slot: 'hat', name: '파나마 모자', price: 40, style: 2, color: 'cream', shape: 'panama',
+    { id: 'hat_panama', memory: '신혼여행 리비에라에서 산 모자. 그녀가 챙을 눌러 씌워 줬다.', slot: 'hat', name: '파나마 모자', price: 40, style: 2, color: 'cream', shape: 'panama',
       weather: { sunny: 2 }, desc: '볕 좋은 날의 정답.',
       pal: { h: '#eadfb8', H: '#cdbf92', b: '#2b211c' } },
-    { id: 'hat_borsalino', slot: 'hat', name: '보르살리노', price: 90, style: 3, color: 'brown', shape: 'fedora',
+    { id: 'hat_borsalino', memory: '첫 월급으로 산 펠트 모자. 그녀는 영화배우 같다며 웃었다.', slot: 'hat', name: '보르살리노', price: 90, style: 3, color: 'brown', shape: 'fedora',
       weather: { cloudy: 1 }, desc: '펠트의 품격. 엔조가 알아본다.',
       pal: { h: '#5e4838', H: '#46352a', b: '#1f1814' } },
-    { id: 'coat_navy', slot: 'coat', name: '네이비 더블 코트', price: 120, style: 3, color: 'blue', shape: 'double', len: 7,
+    { id: 'coat_navy', memory: '단추가 헐거워지면 그녀가 말없이 다시 달아 두곤 했다.', slot: 'coat', name: '네이비 더블 코트', price: 120, style: 3, color: 'blue', shape: 'double', len: 7,
       weather: { rain: 1, cloudy: 1 }, desc: '단추 여섯 개. 흐린 날에 든든하다.',
       pal: { T: '#2f3d5c', A: '#3e4e74', a: '#222b42', P: '#4b5c86', o: '#d6b25a' } },
-    { id: 'coat_trench', slot: 'coat', name: '베이지 트렌치', price: 100, style: 3, color: 'beige', shape: 'trench', len: 9,
+    { id: 'coat_trench', memory: '비 오는 역 앞, 이 코트 하나에 둘이 같이 들어갔었다.', slot: 'coat', name: '베이지 트렌치', price: 100, style: 3, color: 'beige', shape: 'trench', len: 9,
       weather: { cloudy: 2, rain: 1 }, desc: '흐린 날의 클래식.',
       pal: { T: '#c6a97a', A: '#d5ba8d', a: '#a3875b', P: '#dcc59d', o: '#7d633f' } },
-    { id: 'shirt_linen', slot: 'shirt', name: '리넨 셔츠 (파랑)', price: 45, style: 2, color: 'blue',
+    { id: 'shirt_linen', memory: '파란색은 그녀의 색. 그래서 자꾸 이것부터 손이 간다.', slot: 'shirt', name: '리넨 셔츠 (파랑)', price: 45, style: 2, color: 'blue',
       weather: { sunny: 1 }, desc: '바람이 통하는 파란 셔츠.',
       pal: { T: '#7ea5c8', A: '#96b9d9', a: '#5d83a6', C: '#aecbe5' } },
-    { id: 'tie_burgundy', slot: 'tie', name: '버건디 타이', price: 30, style: 2, color: 'red', shape: 'long',
+    { id: 'tie_burgundy', memory: '딸의 결혼식에 맨 넥타이. 그녀가 매듭을 두 번 고쳐 줬다.', slot: 'tie', name: '버건디 타이', price: 30, style: 2, color: 'red', shape: 'long',
       desc: '단정함의 마지막 한 줄.', pal: { D: '#7a2232', d: '#96364a' } },
-    { id: 'tie_scarf', slot: 'tie', name: '실크 스카프', price: 55, style: 2, color: 'blue', shape: 'ascot',
+    { id: 'tie_scarf', memory: '그녀의 스카프를 줄여 만든 것. 아직 라벤더 향이 희미하다.', slot: 'tie', name: '실크 스카프', price: 55, style: 2, color: 'blue', shape: 'ascot',
       desc: '목에 두른 하늘색 실크.', pal: { D: '#5f8fc4', d: '#e8e4d8' } },
-    { id: 'pants_chino', slot: 'pants', name: '화이트 치노', price: 50, style: 2, color: 'white',
+    { id: 'pants_chino', memory: '여름마다 바닷가에서 입었다. 바짓단에 아직 모래가 있다.', slot: 'pants', name: '화이트 치노', price: 50, style: 2, color: 'white',
       weather: { sunny: 1 }, desc: '여름 리비에라의 바지.',
       pal: { L: '#ece6d4', l: '#c8bfa9', B: '#6b4a2f' } },
-    { id: 'shoes_loafer', slot: 'shoes', name: '태슬 로퍼', price: 70, style: 2, color: 'brown',
+    { id: 'shoes_loafer', memory: '춤을 출 때 신던 구두. 그날 그녀의 발을 두 번 밟았다.', slot: 'shoes', name: '태슬 로퍼', price: 70, style: 2, color: 'brown',
       desc: '발끝에서 흔들리는 술 장식.', pal: { F: '#5a2620', f: '#3d1915', q: '#1c120e' } },
-    { id: 'acc_cane', slot: 'acc', name: '지팡이', price: 80, style: 3, color: 'brown', shape: 'cane',
+    { id: 'acc_cane', memory: '짚을 일은 없다. 아직은.', slot: 'acc', name: '지팡이', price: 80, style: 3, color: 'brown', shape: 'cane',
       desc: '짚기보다 멋으로 든다.', pal: { w: '#4a3020', s: '#c9ccd1' } },
-    { id: 'acc_umbrella', slot: 'acc', name: '장우산', price: 35, style: 1, color: 'green', shape: 'umbrella',
+    { id: 'acc_umbrella', memory: '늘 그녀 쪽으로 기울여 들던 우산. 오른쪽 어깨만 젖었다.', slot: 'acc', name: '장우산', price: 35, style: 1, color: 'green', shape: 'umbrella',
       weather: { rain: 3 }, desc: '비 오는 날엔 펼쳐 든다.', pal: { u: '#55653d', U: '#3f4c2c', w: '#6b4a2f' } },
-    { id: 'dog_collar', slot: 'dog', name: '빨간 목줄', price: 20, style: 1, color: 'red', shape: 'collar',
+    { id: 'dog_collar', memory: '강아지를 데려온 날 그녀가 고른 목줄. 방울 소리가 난다.', slot: 'dog', name: '빨간 목줄', price: 20, style: 1, color: 'red', shape: 'collar',
       desc: '강아지용. 소피아가 좋아한다.', pal: { c: '#b23a2a', y: '#e0b23a' } },
-    { id: 'dog_scarf', slot: 'dog', name: '강아지 스카프', price: 25, style: 1, color: 'yellow', shape: 'bandana',
+    { id: 'dog_scarf', memory: '그녀가 남은 천으로 만든 반다나. 바느질이 조금 삐뚤다.', slot: 'dog', name: '강아지 스카프', price: 25, style: 1, color: 'yellow', shape: 'bandana',
       desc: '강아지용 노란 반다나.', pal: { c: '#e3b341', C: '#b8862a' } },
+    /* 선물: 상점에 없음. 조각 f_closet 해금 시 옷장에 들어온다. */
+    { id: 'tie_hers', slot: 'tie', name: '그녀가 고른 넥타이', price: 0, style: 3, color: 'blue', shape: 'long', gift: true,
+      desc: '옷장 맨 안쪽에 걸려 있던 넥타이.', memory: '그녀가 고른 마지막 넥타이. 파란색이었다.',
+      pal: { D: '#3f5f93', d: '#6d8fc2' } },
   ];
 
   PG.BREEDS = [
@@ -77,10 +81,54 @@
   ];
 
   PG.WEATHER = {
-    sunny: { label: '맑음' },
-    cloudy: { label: '흐림' },
-    rain: { label: '비' },
+    sunny: { label: '맑음', theme: '리비에라 산책' },
+    cloudy: { label: '흐림', theme: '펠트와 울' },
+    rain: { label: '비', theme: '우산의 날' },
   };
+
+  /* 동네 소식: 오늘의 주인공 × 날씨 9개 + 기본 3개 */
+  PG.NEWS = [
+    { who: 'marta', weather: 'sunny', text: '마르타가 아침부터 파란 수국을 한가득 내놓았다.' },
+    { who: 'marta', weather: 'cloudy', text: '마르타의 꽃집에 오늘은 파란 꽃이 한 다발 더 들어왔다.' },
+    { who: 'marta', weather: 'rain', text: '마르타가 비 맞은 파란 꽃을 처마 밑으로 옮겼다.' },
+    { who: 'enzo', weather: 'sunny', text: '엔조가 카페 테라스에 의자를 두 개씩 내놓았다.' },
+    { who: 'enzo', weather: 'cloudy', text: '엔조의 카페에서 새로 볶은 원두 냄새가 난다.' },
+    { who: 'enzo', weather: 'rain', text: '엔조가 문 앞에 우산꽂이를 내놓았다. 누굴 기다리나 보다.' },
+    { who: 'sofia', weather: 'sunny', text: '소피아가 골목 바닥에 분필로 강아지를 그리고 있다.' },
+    { who: 'sofia', weather: 'cloudy', text: '소피아가 가방에 강아지 간식을 챙겼다는 소문이다.' },
+    { who: 'sofia', weather: 'rain', text: '소피아가 노란 장화를 신고 웅덩이마다 뛰어든다.' },
+    { text: '광장 분수대 물을 새로 갈았다고 한다.' },
+    { text: '빵집 할머니가 오늘은 무화과 빵을 굽는다.' },
+    { text: '모퉁이 고양이가 새끼들을 데리고 나왔다.' },
+  ];
+
+  /* 호감 단계 이벤트(레벨 2·4). 레벨 2 는 기존 조각을 대화로 풀어 frag 로 해금. 줄은 이웃의 대사. */
+  PG.HEART_EVENTS = [
+    { id: 'h_marta2', who: 'marta', level: 2, frag: 'f_marta1', lines: [
+      '시뇨레, 오늘도 이 길로 오셨네요.',
+      '예전엔 두 분이 같이 지나가셨죠. 늘 이 시간에.',
+      '그분은 꼭 파란 꽃 앞에서 걸음을 멈추셨어요.'] },
+    { id: 'h_marta4', who: 'marta', level: 4, lines: [
+      '이 파란 꽃이요, 사실 팔려고 둔 게 아니에요.',
+      '매주 한 다발씩 남겨둬요. 그분이 고르시던 거라서.',
+      '언젠가 가져가실 날까지 둘게요. 천천히 오세요.'] },
+    { id: 'h_enzo2', who: 'enzo', level: 2, frag: 'f_enzo1', lines: [
+      '늘 드시던 걸로요. 설탕은 둘.',
+      '잔은… 두 개 내릴게요. 저도 이젠 손이 먼저 가서요.',
+      '식기 전에 드세요. 남은 잔은 제가 치울게요.'] },
+    { id: 'h_enzo4', who: 'enzo', level: 4, lines: [
+      '그 두 번째 잔, 처음엔 제 실수인 줄 아셨죠?',
+      '부인께서 늘 창가 자리에서 그걸 드셨거든요.',
+      '자리는 비어도, 잔까지 비워두고 싶진 않았어요.'] },
+    { id: 'h_sofia2', who: 'sofia', level: 2, frag: 'f_sofia1', lines: [
+      '{dog}! {dog}! {dog}!',
+      '봐요, 세 번 부르니까 꼬리로 대답했어요!',
+      '할아버지, 내일도 {dog} 데리고 이 길로 와요. 약속!'] },
+    { id: 'h_sofia4', who: 'sofia', level: 4, lines: [
+      '할아버지 옆엔 원래 누가 있었어요?',
+      '엄마가 그러는데, 모자 쓴 예쁜 할머니였대요.',
+      '그럼 이제 가끔 제가 옆에서 걸을게요. {dog}도 같이요.'] },
+  ];
 
   /* 스토리 조각(일기 한 줄). source:'dog' 은 산책 중 강아지가 발견할 때만 해금. */
   PG.FRAGMENTS = [
@@ -137,6 +185,14 @@
         '그는 모자를 벗고 앉았다. 강아지가 무릎에 턱을 올렸다.',
         '"오늘은 네가 산책시켜 줬구나."'],
       card: '가끔은 따라가는 산책도 좋다.' },
+    { id: 'table', title: '언제나 두 잔', tone: '따뜻',
+      hint: '그녀의 넥타이를 매고 엔조와 가까워지면…',
+      cond: { type: 'all', of: [{ type: 'hersTieDays', min: 2 }, { type: 'aff', who: 'enzo', min: 3 }] },
+      lines: ['그날 아침, 엔조는 말없이 잔 두 개를 내려놓았다.',
+        '"그 넥타이, 부인께서 고르신 거죠? 잘 어울리세요."',
+        '그는 처음으로 두 번째 잔을 돌려보내지 않았다.',
+        '한 잔은 자신의 몫, 한 잔은 그녀의 몫. 천천히, 둘 다 마셨다.'],
+      card: '두 번째 잔은 이제 비워지는 잔이 되었다.' },
   ];
 
   /* 조건 판정 (state = 세이브 객체) */
@@ -149,13 +205,14 @@
       case 'walks': return (s.day - 1) >= c.min;
       case 'route': return ((s.routeCounts && s.routeCounts[c.route]) || 0) >= c.min;
       case 'alleyRain': return (s.alleyRain || 0) >= c.min;
+      case 'hersTieDays': return (s.hersTieDays || 0) >= c.min;
       default: return false;
     }
   };
 
   PG.newSave = function (breed, name) {
     return {
-      v: 2,
+      v: 3,
       dog: { breed: breed, name: name },
       day: 1,
       coins: 30,
@@ -172,6 +229,11 @@
       routeCounts: { park: 0, cafe: 0, alley: 0 },
       alleyRain: 0,
       gestKnown: {},
+      wornCount: {},        // itemId -> 산책 완료 착용 횟수
+      hersTieDays: 0,       // 그녀의 넥타이로 마르타 스윗존 인사한 날 수
+      hersTieLast: 0,       // 위 카운트를 마지막으로 올린 day (하루 1회)
+      heartSeen: [],        // 본 호감 이벤트 id
+      eveningDay: 0,        // 저녁 산책을 한 day
     };
   };
 
@@ -184,9 +246,13 @@
     s.routeCounts = Object.assign({}, d.routeCounts, s.routeCounts || {});
     if (typeof s.dogMood !== 'number' || isNaN(s.dogMood)) s.dogMood = 60;
     if (!s.gestKnown || typeof s.gestKnown !== 'object') s.gestKnown = {};
-    ['owned', 'unlockedFragments', 'endingsSeen'].forEach((k) => { if (!Array.isArray(s[k])) s[k] = d[k].slice(); });
+    if (!s.wornCount || typeof s.wornCount !== 'object') s.wornCount = {};
+    ['hersTieDays', 'hersTieLast', 'eveningDay'].forEach((k) => { if (typeof s[k] !== 'number' || isNaN(s[k])) s[k] = 0; });
+    ['owned', 'unlockedFragments', 'endingsSeen', 'heartSeen'].forEach((k) => { if (!Array.isArray(s[k])) s[k] = d[k].slice(); });
     if (!s.equipped || typeof s.equipped !== 'object') s.equipped = Object.assign({}, d.equipped);
-    s.v = 2;
+    // 이미 옷장 조각을 연 예전 세이브는 그녀의 넥타이를 받은 것으로
+    if (s.unlockedFragments.includes('f_closet') && !s.owned.includes('tie_hers')) s.owned.push('tie_hers');
+    s.v = 3;
     return s;
   };
 

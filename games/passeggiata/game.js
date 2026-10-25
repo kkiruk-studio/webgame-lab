@@ -226,9 +226,9 @@
     }
     return { X, Y, hand: [X + g.hand[0], Y + g.hand[1]] };
   }
-  function drawDog(ctx, H, breed, sx, frame, item, flip) {
+  function drawDog(ctx, H, breed, sx, frame, item, flip, dy) {
     const L = lay(H), d = S.dog(breed, frame, item);
-    const x0 = sx - (d.w >> 1), y0 = L.yF - (d.h - 1);
+    const x0 = sx - (d.w >> 1), y0 = L.yF - (d.h - 1) + (dy || 0);
     ctx.drawImage(flip ? flipCache(d) : d.c, x0 - 1, y0 - 1);
     const nx = flip ? x0 + (d.w - 1 - d.neck[0]) : x0 + d.neck[0];
     return { neck: [nx, y0 + d.neck[1]], top: y0 - 1 };
@@ -316,7 +316,7 @@
     x.fillStyle = '#2b211c';
     x.font = '700 ' + 9 * K / 1.5 * 1.1 + 'px -apple-system,"Apple SD Gothic Neo",sans-serif';
     x.textBaseline = 'middle';
-    x.fillText('Day ' + lw.day + ' · ' + PG.WEATHER[lw.weather].label + ' · ' + st.dog.name + '와 산책', bw * K, ty);
+    x.fillText('Day ' + lw.day + (lw.evening ? ' · 저녁' : '') + ' · ' + PG.WEATHER[lw.weather].label + ' · ' + st.dog.name + '와 산책', bw * K, ty);
     x.font = 'italic 700 ' + 9 * K / 1.5 * 1.1 + 'px Georgia,serif';
     x.textAlign = 'right'; x.fillStyle = '#94451f';
     x.fillText('Passeggiata', c.width - bw * K, ty);
@@ -344,6 +344,15 @@
       x.drawImage(bq, 136, L.yF - 34);
       const g = drawGent(x, H, eq, 108, eq.hat ? 7 : 4);
       const d = drawDog(x, H, breed, 70, 'w0', eq.dog);
+      drawLeash(x, [g.hand[0] + 1, g.hand[1] + 1], d.neck);
+    } else if (id === 'table') {
+      drawBase(bg, W, H, 600, 'sunny', { seed: 4, avoid: [150, 175], events: [{ type: 'nbr', id: 'enzo', x: 750 }] });
+      const cf = S.prop('cafe'), c0 = 154, r0 = L.yB + 13 - cf.height;
+      bg.fillStyle = '#2b211c'; bg.fillRect(c0 + 18, r0 + 2, 4, 3);   // 두 번째 잔
+      bg.fillStyle = '#e8e4d8'; bg.fillRect(c0 + 19, r0 + 3, 2, 2);
+      drawNeighbor(x, H, 'enzo', 150, 0);
+      const g = drawGent(x, H, eq, 112, 5);
+      const d = drawDog(x, H, breed, 74, 'w0', eq.dog);
       drawLeash(x, [g.hand[0] + 1, g.hand[1] + 1], d.neck);
     } else {
       drawBase(bg, W, H, 900, 'cloudy', { sky: 'dusk', alley: true, seed: 8, avoid: [110, 150] });
@@ -383,7 +392,8 @@
   DEBUG.scene = () => sceneName;
   function updateHUD() {
     if (!st) return;
-    const d = sceneName === 'result' && st.lastWalk ? st.lastWalk.day : st.day;
+    const ww = scenes.walk && scenes.walk.w;
+    const d = sceneName === 'result' && st.lastWalk ? st.lastWalk.day : sceneName === 'walk' && ww && ww.evening ? ww.di.day : st.day;
     $('hudDay').textContent = 'Day ' + d;
     $('hudCoins').textContent = st.coins;
   }
@@ -448,8 +458,12 @@
       $('wIcon').src = S.iconURL(di.weather === 'sunny' ? 'sun' : di.weather === 'cloudy' ? 'cloudi' : 'rain');
       $('wWeather').textContent = 'Day ' + st.day + ' · ' + PG.WEATHER[di.weather].label;
       $('wStars').innerHTML = starsHTML(sc.stars);
+      $('wTheme').textContent = PG.WEATHER[di.weather].theme || '';
+      $('wScore').innerHTML = '<span class="chip mini">스타일 ' + sc.style + '</span><span class="chip mini">날씨 +' + sc.weather + '</span>' +
+        '<span class="chip mini' + (sc.fav ? ' ok' : '') + '">' + NB[di.featured].name + ' 취향 ' + (sc.fav ? '✓' : '–') + '</span>';
       const wtip = di.weather === 'rain' ? ' 비 오는 날엔 우산·코트가 좋아요.' : di.weather === 'cloudy' ? ' 흐린 날엔 코트가 어울려요.' : '';
       $('wHint').textContent = '오늘의 힌트 · ' + fillDog(NB[di.featured].hint) + wtip;
+      $('wNews').textContent = '오늘 소식 · ' + newsFor(di);
       const tabs = $('wTabs'); tabs.innerHTML = '';
       TABS.forEach((s) => {
         const b = document.createElement('button');
@@ -471,7 +485,7 @@
         const b = document.createElement('button');
         b.className = 'cell' + (on ? ' on' : '');
         b.innerHTML = '<img src="' + iconFor(id) + '" alt="">' + it.name + (on ? '<span class="tag">착용</span>' : '');
-        b.addEventListener('click', () => { st.equipped[slot] = id; save(); this.build(); $('wDesc').textContent = it.desc || ''; });
+        b.addEventListener('click', () => { st.equipped[slot] = id; save(); this.build(); $('wDesc').innerHTML = descHTML(it); });
         grid.appendChild(b);
       });
       if (!owned.length) {
@@ -494,6 +508,19 @@
       ctx.drawImage(big, gx, LH - 14 - (lay(tmpH).yF) * 2, 160, 128);
     },
   };
+  /* 아이템 설명 + 기억(두 번 이상 입은 옷, 선물은 처음부터) */
+  function descHTML(it) {
+    const n = (st.wornCount && st.wornCount[it.id]) || 0;
+    const mem = it.memory ? (it.gift || n >= 2 ? it.memory : '…(두 번 입으면 떠오른다)') : '';
+    return (it.desc || '') + (mem ? '<br><span class="mem">' + mem + '</span>' : '');
+  }
+  /* 동네 소식: 주인공×날씨 문장, 나흘에 한 번은 기본 소식 */
+  function newsFor(di) {
+    const dflt = PG.NEWS.filter((n) => !n.who);
+    if (di.day % 4 === 3) return dflt[Math.floor(di.day / 4) % dflt.length].text;
+    const m = PG.NEWS.find((n) => n.who === di.featured && n.weather === di.weather);
+    return (m || dflt[di.day % dflt.length]).text;
+  }
   const ICONS = {};
   function iconFor(id) { const k = id + st.dog.breed; return ICONS[k] || (ICONS[k] = S.itemIconURL(id, st.dog.breed)); }
   $('wShop').addEventListener('click', () => go('shop'));
@@ -519,16 +546,31 @@
   const ZONE_A = 58, ZONE_B = 34;               // 스윗존(눈 맞춤): gx ∈ [e.x-58, e.x-34]
   const MOOD_HELD = 2.5, MOOD_FREE = 1.5, MOOD_SNIFF = 12;
   function shuffle(a, r) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-  function makeWalk() {
-    const di = dayInfo(st.day);
+  const EVE_LEN = 760, EVE_SPLIT = 380;           // 저녁 산책: 집앞 + 랜덤 1 세그먼트
+  function makeWalk(opts) {
+    const eve = !!(opts && opts.evening);
+    const base = dayInfo(eve && st.lastWalk ? st.lastWalk.day : st.day);
+    const di = eve ? Object.assign({}, base, { seed: base.seed + 5003 }) : base;
+    const len = eve ? EVE_LEN : LEN;
     const m = typeof st.dogMood === 'number' ? st.dogMood : 60;
-    const w = { di, t: 0, gx: 0, mode: 'walk', mt: 0, anim: 0, dogOff: 30, dogAnim: 0, dogState: 'walk', dogT: 0,
+    const w = { di, evening: eve, len, sky: eve ? 'dusk' : null, streak: 0, badgeN: -1, hop: 0, dust: null, tug: 0,
+      heart: null, heartPending: null, dlgI: 0, dlgAt: 0, hersTie: false, t: 0, gx: 0, mode: 'walk', mt: 0, anim: 0, dogOff: 30, dogAnim: 0, dogState: 'walk', dogT: 0,
       events: [], hazards: [], coins: [], sparks: [], splash: [], earned: 0, findCoins: 0, aff: { marta: 0, enzo: 0, sofia: 0 }, greets: [],
       dogFreeGain: 0, frags: [], blue: false, featuredFav: false, shot: null, shotScore: -1, wantShot: 0, cur: null,
-      door: 0, fade: 0, done: false, rain: [], held: false, holdT: 0, mood: st.day > 1 ? Math.min(100, m + 10) : m,
+      door: 0, fade: 0, done: false, rain: [], held: false, holdT: 0, mood: !eve && st.day > 1 ? Math.min(100, m + 10) : m,
       dirt: 0, route: ['home'], dogBubble: null, hintT: 0, moodCells: -1, gest: null, greetDur: 2, promptAt: 0,
       segs: [{ x0: 0, x1: SEG_X[1], type: 'home' }, { x0: SEG_X[1], x1: SEG_X[2], type: null }, { x0: SEG_X[2], x1: LEN + 800, type: null }],
       forks: [], nbrPool: [] };
+    if (eve) {
+      const r = rng(di.seed + 77), others = ['marta', 'enzo', 'sofia'].filter((id) => id !== di.featured);
+      w.segs = [{ x0: 0, x1: EVE_SPLIT, type: 'home' }, { x0: EVE_SPLIT, x1: len + 800, type: null }];
+      w.nbrPool = [others[Math.floor(r() * others.length)]];
+      buildSeg(w, 0, 'home');
+      const t = r() < 0.5 ? 'park' : 'alley';
+      w.segs[1].type = t; w.route.push(t); buildSeg(w, 1, t);
+      if (di.weather === 'rain') for (let i = 0; i < 80; i++) w.rain.push({ x: Math.random() * 600, y: Math.random() * 200, s: 140 + Math.random() * 60 });
+      return w;
+    }
     // 이웃: 집앞=오늘의 주인공, 나머지 둘은 고른 경로(카페·뒷골목)에서 만날 수 있음
     w.nbrPool = [di.featured].concat(shuffle(['marta', 'enzo', 'sofia'].filter((id) => id !== di.featured), rng(di.seed + 313)));
     // 갈림길 제시: 두 갈림길 합쳐 세 타입이 모두 한 번 이상 보이게
@@ -542,11 +584,12 @@
   }
   /* 세그먼트 si 의 이벤트·위험물·코인을 경로 타입에 맞춰 생성 */
   function buildSeg(w, si, type) {
-    const x0 = w.segs[si].x0, x1 = si < 2 ? w.segs[si].x1 : LEN;
+    const x0 = w.segs[si].x0, x1 = si < w.segs.length - 1 ? w.segs[si].x1 : w.len;
     const r = rng(w.di.seed * 13 + si * 101 + type.charCodeAt(0) * 7);
     const ri = (a, b) => a + Math.floor(r() * (b - a + 1));
     let nN, nS, nH;
-    if (type === 'home') { nN = 1; nS = 1; nH = 1; }
+    if (w.evening) { nN = type === 'home' ? 1 : 0; nS = 1; nH = type === 'home' ? 0 : 1; } // 저녁: 이웃1·냄새2·위험물1
+    else if (type === 'home') { nN = 1; nS = 1; nH = 1; }
     else if (type === 'park') { nN = 0; nS = 2; nH = 1; }
     else if (type === 'cafe') { nN = ri(1, 2); nS = ri(0, 1); nH = 0; }
     else { nN = ri(0, 1); nS = 1; nH = 1; }
@@ -554,7 +597,7 @@
     for (let k = 0; k < nN && w.nbrPool.length; k++) items.push({ k: 'n', id: w.nbrPool.shift() });
     for (let k = 0; k < nS; k++) items.push({ k: 's' });
     for (let k = 0; k < nH; k++) items.push({ k: 'h', h: (type === 'home' && w.di.day === 1) || r() < 0.5 ? 'puddle' : 'pigeon' });
-    if (w.di.weather === 'rain' && type !== 'home') items.push({ k: 'h', h: 'puddle' });
+    if (w.di.weather === 'rain' && type !== 'home' && !w.evening) items.push({ k: 'h', h: 'puddle' });
     shuffle(items, r);
     if (type === 'home') items.sort((a, b) => (a.k === 'h' ? 0 : 1) - (b.k === 'h' ? 0 : 1)); // 집앞은 위험물부터(연습)
     const start = x0 + (si === 0 ? 150 : 100), span = x1 - 50 - start, n = items.length;
@@ -567,7 +610,7 @@
     });
     w.events.sort((a, b) => a.x - b.x);
     const mult = type === 'alley' ? 1.6 : 1;
-    for (let x = x0 + (si === 0 ? 70 : 30); x < x1 - 10; x += 26 + Math.floor(r() * 22)) {
+    for (let x = x0 + (si === 0 ? 70 : 30); x < x1 - 10; x += (26 + Math.floor(r() * 22)) * (w.evening ? 2 : 1)) {
       if (w.events.some((e) => e.type === 'nbr' && x > e.x - 60 && x < e.x + 20)) continue;
       if (w.hazards.some((h) => Math.abs(h.x - x) < 10)) continue;
       const v = r() < 0.75 ? 1 : r() < 0.7 ? 2 : 3;
@@ -585,7 +628,7 @@
   }
   function birdsFly(h, k) { h.fly = true; h.birds.forEach((b, i) => { b.vx = (25 + i * 12) * k; b.vy = -(35 + i * 10) * k; }); }
   function accident(w, h) {
-    h.hit = true; w.dirt += 1;
+    h.hit = true; w.dirt += 1; w.streak = 0;
     const bump = 2 + Math.floor(Math.random() * 3); w.findCoins += bump;
     if (h.kind === 'puddle') {
       for (let i = 0; i < 12; i++) w.splash.push({ x: h.x + Math.random() * 10 - 5, y: 0, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 45, life: 0.7 });
@@ -657,30 +700,37 @@
       case 'greet':
         w.mt += dt;
         if (w.mt > 0.6 && w.mt - dt <= 0.6) w.wantShot = w.cur.perfect || w.cur.fav ? 3 : 2;
-        if (w.mt >= w.greetDur) { w.cur.done = true; w.mode = 'walk'; }
+        if (w.mt >= w.greetDur) { w.cur.done = true; if (w.heartPending) startHeart(w, w.heartPending); else w.mode = 'walk'; }
+        break;
+      case 'heart':
+        w.mt += dt;
         break;
       case 'home':
         w.mt += dt; w.fade = clamp((w.mt - 0.6) / 0.8, 0, 1);
         if (w.mt >= 1.5) { w.done = true; finishWalk(w); return; }
         break;
     }
-    if (w.mode !== 'home' && w.gx >= LEN) { w.mode = 'home'; w.mt = 0; hidePrompt(); moving = false; }
-    if (!w.door && w.gx >= LEN - 4.5 * SPEED) w.door = LEN + 22;
-    if (w.gx > LEN * 0.3 && w.shotScore < 1 && !w.wantShot && w.mode === 'walk') w.wantShot = 1;
+    if (w.mode !== 'home' && w.gx >= w.len) { w.mode = 'home'; w.mt = 0; hidePrompt(); moving = false; }
+    if (!w.door && w.gx >= w.len - 4.5 * SPEED) w.door = w.len + 22;
+    if (w.gx > w.len * 0.3 && w.shotScore < 1 && !w.wantShot && w.mode === 'walk') w.wantShot = 1;
     w.moving = moving;
     if (moving) w.anim += dt;
     // 줄 · 강아지 기분
     if (w.held) w.holdT += dt;
-    if (w.mode !== 'home') {
+    if (w.mode !== 'home' && w.mode !== 'heart') {
       if (w.held) { if (w.holdT > 1) w.mood -= MOOD_HELD * dt; } else w.mood += MOOD_FREE * dt;
       w.mood = clamp(w.mood, 0, 100);
     }
     // 강아지
     if (w.dogT > 0) { w.dogT -= dt; if (w.dogT <= 0 && w.dogState !== 'sniff') w.dogState = 'walk'; }
+    // 놓기 손맛: hop 동안 앞으로 6px 더, 먼지·당김 이펙트 수명
+    if (w.hop > 0) { const k = Math.min(w.hop, dt); w.hop -= k; if (w.mode !== 'sniff') w.dogOff += 24 * k; }
+    if (w.dust) { w.dust.t -= dt; if (w.dust.t <= 0) w.dust = null; }
+    if (w.tug > 0) w.tug -= dt;
     if (w.mode !== 'sniff') {
       let target;
       if (w.dogState === 'chase') target = 80;
-      else if (w.mode === 'greet') target = 18;
+      else if (w.mode === 'greet' || w.mode === 'heart') target = 18;
       else if (w.held) target = 14;
       else target = 34 + (REDUCED ? 0 : Math.sin(w.t * 2.2) * 3);
       const prev = w.dogOff, rate = w.dogState === 'chase' ? 90 : Math.abs(target - w.dogOff) > 24 ? 45 : 22;
@@ -708,8 +758,9 @@
     w.sparks = w.sparks.filter((s) => s.life > 0);
     w.events.forEach((e) => { if (e.bt > 0) e.bt -= dt; });
     if (w.rain.length) w.rain.forEach((d) => { d.y += d.s * dt; d.x -= 30 * dt; if (d.y > LH) { d.y = -4; d.x = Math.random() * (LW + 40); } if (d.x < -4) d.x += LW + 20; });
-    $('timebar').style.width = clamp((1 - w.gx / LEN) * 100, 0, 100) + '%';
-    $('timebar').classList.toggle('low', w.gx > LEN - 10 * SPEED);
+    $('timebar').style.width = clamp((1 - w.gx / w.len) * 100, 0, 100) + '%';
+    $('timebar').classList.toggle('low', w.gx > w.len - 10 * SPEED);
+    if (w.streak !== w.badgeN) { w.badgeN = w.streak; $('streakBadge').hidden = w.streak < 2; $('streakBadge').textContent = '×' + w.streak; }
     $('hudCoins').textContent = st.coins + w.earned + w.findCoins;
     const cells = Math.ceil(w.mood / 25 - 1e-9);
     if (cells !== w.moodCells) { w.moodCells = cells; document.querySelectorAll('#moodBar i').forEach((el, i) => el.classList.toggle('on', i < cells)); }
@@ -718,6 +769,7 @@
     if (DEBUG.autoTap) {
       w.held = false;
       if (w.mode === 'fork') chooseRoute(w, 0);
+      else if (w.mode === 'heart') heartTap(w, true);
       else if (w.mode === 'nbrPrompt' && w.gx >= w.cur.x - ZONE_A) walkGesture(w, NB[w.cur.id].gesture);
     }
   }
@@ -743,17 +795,20 @@
     let dogFx = null;
     if (w.mood < 25) { gain = Math.max(0, gain - 1); dogFx = 'bark'; }
     else if (w.mood >= 85 && inZone) { gain += e.id === 'sofia' ? 2 : 1; dogFx = 'trick'; }
+    const hersTie = e.id === 'marta' && inZone && st.equipped.tie === 'tie_hers';
+    if (hersTie) { gain += 1; w.hersTie = true; }
     w.mode = 'greet'; w.mt = 0; w.gest = g; w.greetDur = g === 'talk' ? 4.5 : 2;
     e.fav = fav; e.perfect = perfect;
     w.aff[e.id] += gain;
+    w.heartPending = heartFor(e.id, (st.affinity[e.id] || 0) + w.aff[e.id]);
     w.greets.push({ id: e.id, fav, gain, gesture: g, perfect });
     if (e.id === 'marta' && eqItems(st.equipped).some((i) => i.color === 'blue')) w.blue = true;
     if (e.id === w.di.featured && fav) w.featuredFav = true;
-    e.bubble = !inZone ? 'awk' : gain >= 2 ? 'h2' : gain >= 1 ? 'h1' : 'dots'; e.bt = w.greetDur + 0.6;
+    e.bubble = !inZone ? 'awk' : hersTie || gain >= 2 ? 'h2' : gain >= 1 ? 'h1' : 'dots'; e.bt = w.greetDur + 0.6;
     if (dogFx === 'bark') w.dogBubble = { k: 'bang', t: 1.6 };
     else if (dogFx === 'trick') { w.dogState = 'trick'; w.dogT = 1.2; }
     const hearts = gain ? ' ' + '♥'.repeat(gain) : '';
-    const dogNote = dogFx === 'bark' ? ' · ' + josa(st.dog.name, '이/가') + ' 짖었다' : dogFx === 'trick' ? ' · ' + josa(st.dog.name, '이/가') + ' 재주를 부렸다' : '';
+    const dogNote = (hersTie ? ' · 마르타가 넥타이를 한참 바라봤다' : '') + (dogFx === 'bark' ? ' · ' + josa(st.dog.name, '이/가') + ' 짖었다' : dogFx === 'trick' ? ' · ' + josa(st.dog.name, '이/가') + ' 재주를 부렸다' : '');
     if (!inZone) { toast(n.name + ' · 어색… 눈 맞춤 구간을 놓쳤다' + hearts + dogNote, 2400); return; }
     if (perfect && !(st.gestKnown && st.gestKnown[e.id])) {
       st.gestKnown = st.gestKnown || {}; st.gestKnown[e.id] = true;
@@ -771,13 +826,42 @@
     w.mood = clamp(w.mood + MOOD_SNIFF, 0, 100);
     const total = st.dogFree + w.dogFreeGain;
     const frag = PG.FRAGMENTS.find((f) => f.source === 'dog' && !st.unlockedFragments.includes(f.id) && !w.frags.includes(f.id) && total >= f.cond.min);
-    if (frag && Math.random() < (rich ? 0.95 : 0.75)) { w.frags.push(frag.id); toast(frag.text, 3400); }
-    else if (Math.random() < (rich ? 0.9 : 0.6)) { const v = (rich ? 6 : 4) + Math.floor(Math.random() * (rich ? 7 : 5)); w.findCoins += v; toast('강아지의 발견: 코인 뭉치 +' + v); }
-    else toast(josa(st.dog.name, '이/가') + ' 만족스럽게 킁킁거렸다.');
+    w.streak += 1;
+    const sb = w.streak >= 2 ? w.streak : 0;
+    if (sb) w.findCoins += sb;
+    const tail = sb ? '  ·  연속 발견 ×' + w.streak + ' (+' + sb + ')' : '';
+    if (frag && Math.random() < (rich ? 0.95 : 0.75)) { w.frags.push(frag.id); toast(frag.text + tail, 3400); }
+    else if (Math.random() < (rich ? 0.9 : 0.6)) { const v = (rich ? 6 : 4) + Math.floor(Math.random() * (rich ? 7 : 5)); w.findCoins += v; toast('강아지의 발견: 코인 뭉치 +' + v + tail); }
+    else toast(josa(st.dog.name, '이/가') + ' 만족스럽게 킁킁거렸다.' + tail);
+  }
+  /* 호감 단계 이벤트 */
+  function heartFor(id, total) {
+    return PG.HEART_EVENTS.filter((h) => h.who === id && total >= h.level && !st.heartSeen.includes(h.id))
+      .sort((a, b) => a.level - b.level)[0] || null;
+  }
+  function startHeart(w, h) {
+    w.mode = 'heart'; w.heart = h; w.heartPending = null; w.dlgI = 0; w.mt = 0; w.dlgAt = performance.now();
+    setHeld(w, false); hidePrompt();
+    $('dlgName').textContent = NB[h.who].name;
+    $('dlgText').textContent = fillDog(h.lines[0]);
+    $('dlg').hidden = false;
+  }
+  function heartTap(w, force) {
+    if (!w || w.mode !== 'heart') return;
+    if (!force && performance.now() - w.dlgAt < 300) return;   // 인사 직후 오탭 방지
+    w.dlgAt = performance.now();
+    const h = w.heart;
+    w.dlgI += 1;
+    if (w.dlgI < h.lines.length) { $('dlgText').textContent = fillDog(h.lines[w.dlgI]); return; }
+    $('dlg').hidden = true;
+    if (!st.heartSeen.includes(h.id)) st.heartSeen.push(h.id);
+    if (h.frag && !st.unlockedFragments.includes(h.frag) && !w.frags.includes(h.frag)) w.frags.push(h.frag);
+    w.heart = null; w.mode = 'walk';
   }
   function walkTap() {
     const w = scenes.walk.w;
     if (!w || w.done) return;
+    if (w.mode === 'heart') { heartTap(w); return; }
     if (w.mode === 'walk') w.smile = 0.6;
   }
   function walkSwipe(dir) {
@@ -786,7 +870,12 @@
     if (w.mode === 'fork') chooseRoute(w, dir === 'up' ? 0 : 1);
     else if (w.mode === 'nbrPrompt') walkGesture(w, dir === 'up' ? 'hat' : 'bow');
   }
-  function setHeld(w, v) { if (!w) return; if (v && !w.held) w.holdT = 0; w.held = v; }
+  function setHeld(w, v) {
+    if (!w) return;
+    if (v && !w.held) { w.holdT = 0; w.tug = 0.25; }
+    else if (!v && w.held && w.mode !== 'heart' && w.mode !== 'home') { w.hop = 0.25; w.dust = { x: w.gx + w.dogOff - 10, t: 0.3 }; }
+    w.held = v;
+  }
   DEBUG.tap = walkTap;
   DEBUG.swipe = walkSwipe;
   DEBUG.hold = (v) => setHeld(scenes.walk.w, !!v);
@@ -794,13 +883,13 @@
   Object.defineProperty(DEBUG, 'w', { get: () => scenes.walk.w });
   const inp = { down: false, id: null, x0: 0, y0: 0, t0: 0, swiped: false, consumed: false };
   scenes.walk = {
-    enter() {
+    enter(arg) {
       inp.down = false;
-      this.w = makeWalk(); hidePrompt();
-      if (st.day === 1) { showPrompt('누르고 있으면 줄 당기기 · 떼면 자유롭게', '', 'none'); this.w.hintT = 4; }
+      this.w = makeWalk(arg); hidePrompt(); $('dlg').hidden = true;
+      if (st.day === 1 && !this.w.evening) { showPrompt('누르고 있으면 줄 당기기 · 떼면 자유롭게', '', 'none'); this.w.hintT = 4; }
       this.render(lx);
     },
-    exit() { hidePrompt(); inp.down = false; },
+    exit() { hidePrompt(); $('dlg').hidden = true; inp.down = false; },
     update(dt) {
       const w = this.w;
       if (inp.down && !inp.swiped && !inp.consumed && w.mode === 'nbrPrompt' && inp.t0 >= w.promptAt && performance.now() - inp.t0 >= 700) {
@@ -815,7 +904,7 @@
   function drawWalk(ctx, w) {
     const W = LW, H = LH, L = lay(H), gxS = Math.round(W * 0.3), camX = Math.floor(w.gx) - gxS;
     const weather = w.di.weather;
-    drawBase(ctx, W, H, camX, weather, { t: w.t, events: w.events, seed: w.di.seed, door: w.door, segs: w.segs,
+    drawBase(ctx, W, H, camX, weather, { sky: w.sky, t: w.t, events: w.events, seed: w.di.seed, door: w.door, segs: w.segs,
       avoid: w.forks.map((f) => f.x + 24).concat(w.hazards.map((h) => h.x)) });
     // 갈림길 표지판
     const sign = S.prop('sign');
@@ -881,8 +970,11 @@
     else dfr = (w.dogState === 'sulk' ? 'k' : 'w') + (w.dogMoving ? Math.floor(w.dogAnim / 0.11) % 4 : 0);
     if (w.dogState === 'sniff' && Math.floor(w.mt * 4) % 2) dfr = 'w0';
     if (w.dogState === 'trick') { flip = Math.floor(w.dogT / 0.15) % 2 === 1; dfr = 'w' + (Math.floor(w.dogT / 0.08) % 4); }
-    const d = drawDog(ctx, H, st.dog.breed, dsx, dfr, st.equipped.dog, flip);
+    const hopDy = w.hop > 0 ? -Math.round(3 * Math.sin(Math.PI * (1 - w.hop / 0.25))) : 0;
+    const d = drawDog(ctx, H, st.dog.breed, dsx, dfr, st.equipped.dog, flip, hopDy);
+    if (w.dust) ctx.drawImage(S.prop(w.dust.t > 0.15 ? 'dust0' : 'dust1'), Math.round(w.dust.x - camX) - 3, L.yF - 2);
     const g = drawGent(ctx, H, st.equipped, gxS, f, { weather, dy: gdy });
+    if (w.tug > 0) ctx.drawImage(S.prop('spark'), g.hand[0] + 2, g.hand[1] - 5);
     drawLeash(ctx, [g.hand[0] + 1, g.hand[1] + 1], d.neck, w.held || w.dogState === 'chase');
     if (w.dogBubble) drawBubble(ctx, dsx, d.top, w.dogBubble.k);
     if (w.dogState === 'trick') ctx.drawImage(S.prop('spark'), dsx - 2, d.top - 6 - (Math.floor(w.dogT * 8) % 2));
@@ -895,6 +987,7 @@
       ctx.fillStyle = '#8a7a5c';
       w.splash.forEach((s) => ctx.fillRect(Math.round(s.x - camX), Math.round(L.yF - 1 + s.y), 1, 1));
     }
+    if (w.evening) { ctx.fillStyle = 'rgba(90,60,90,0.12)'; ctx.fillRect(0, 0, W, H); }
     if (w.rain.length) {
       ctx.fillStyle = 'rgba(60,70,90,0.12)'; ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(214,226,236,0.75)';
@@ -910,25 +1003,29 @@
   /* ---------- 결산 계산 ---------- */
   function finishWalk(w) {
     const di = w.di, sc = outfitScore(st.equipped, di);
-    const stars = Math.max(1, sc.stars - Math.min(w.dirt, 2));
-    const bonus = stars * 2 + (w.featuredFav ? 5 : 0);
+    const stars = Math.max(1, sc.stars - Math.min(w.dirt, 2)), eve = !!w.evening;
+    const bonus = eve ? 0 : stars * 2 + (w.featuredFav ? 5 : 0);
     const total = w.earned + w.findCoins + bonus;
     st.coins += total;
     Object.keys(w.aff).forEach((k) => (st.affinity[k] += w.aff[k]));
     st.dogFree += w.dogFreeGain;
     if (w.blue) st.blueGreetDays += 1;
+    eqItems(st.equipped).forEach((i) => { st.wornCount[i.id] = (st.wornCount[i.id] || 0) + 1; });
+    if (w.hersTie && st.hersTieLast !== di.day) { st.hersTieDays += 1; st.hersTieLast = di.day; }
     st.dogMood = clamp(Math.round(w.mood), 0, 100);
     w.route.slice(1).forEach((t) => {
       st.routeCounts[t] = (st.routeCounts[t] || 0) + 1;
       if (t === 'alley' && di.weather === 'rain') st.alleyRain = (st.alleyRain || 0) + 1;
     });
-    st.day += 1;
+    if (eve) st.eveningDay = di.day; else st.day += 1;
     const newFr = w.frags.slice();
     w.frags.forEach((id) => st.unlockedFragments.push(id));
     PG.FRAGMENTS.forEach((f) => {
       if (f.source === 'dog' || st.unlockedFragments.includes(f.id)) return;
       if (PG.evalCond(f.cond, st)) { st.unlockedFragments.push(f.id); newFr.push(f.id); }
     });
+    let gift = null;
+    if (newFr.includes('f_closet') && !st.owned.includes('tie_hers')) { st.owned.push('tie_hers'); gift = 'tie_hers'; }
     let diary;
     if (newFr.length) diary = FRAG[newFr[newFr.length - 1]].text;
     else diary = PG.DAILY_LINES[(di.day * 5 + w.greets.length) % PG.DAILY_LINES.length];
@@ -938,7 +1035,7 @@
     }
     if (!w.shot) w.shot = cropShot(lo, Math.round(LW * 0.3));
     st.lastWalk = {
-      day: di.day, weather: di.weather, stars, dirt: Math.min(w.dirt, 2), route: w.route.slice(), mood: st.dogMood,
+      day: di.day, evening: eve, gift, weather: di.weather, stars, dirt: Math.min(w.dirt, 2), route: w.route.slice(), mood: st.dogMood,
       coins: { pick: w.earned, find: w.findCoins, bonus, total },
       aff: w.aff, greets: w.greets, dogFree: w.dogFreeGain, diary, newFrags: newFr,
       shot: w.shot.toDataURL('image/png'),
@@ -966,7 +1063,9 @@
     enter() {
       const lw = st.lastWalk;
       if (!lw) { go('wardrobe'); return; }
-      $('rTitle').textContent = 'Day ' + lw.day + ' 귀가 · ' + PG.WEATHER[lw.weather].label;
+      $('rTitle').textContent = 'Day ' + lw.day + (lw.evening ? ' 저녁 산책 · ' : ' 귀가 · ') + PG.WEATHER[lw.weather].label;
+      $('adWrap').hidden = true;
+      $('rEve').hidden = !!lw.evening || st.eveningDay === lw.day || !!st.pendingEnding;
       $('rPick').textContent = '+' + lw.coins.pick;
       $('rFind').textContent = '+' + lw.coins.find;
       $('rBonus').textContent = '+' + lw.coins.bonus;
@@ -985,14 +1084,37 @@
           ((lw.greets || []).some((x) => x.id === n.id && x.perfect) ? '<span class="badge">완벽 인사</span>' : '') + '</span></div>';
       }).join('');
       $('rDiary').textContent = '일기 · ' + lw.diary;
+      if (lw.gift && ITEM[lw.gift]) {
+        const gl = document.createElement('span');
+        gl.className = 'mem'; gl.style.display = 'block'; gl.textContent = '옷장 맨 안쪽에서 넥타이를 꺼냈다.';
+        $('rDiary').appendChild(gl);
+        toast('옷장 맨 안쪽에서 넥타이를 꺼냈다. · ' + ITEM[lw.gift].name, 3200);
+      }
       $('rShot').removeAttribute('src');
       cardCanvas = null;
       makeCard(lw.shot, lw).then((c) => { cardCanvas = c; $('rShot').src = c.toDataURL('image/png'); });
       $('rNext').textContent = st.pendingEnding ? '…그날 저녁' : '내일 산책';
     },
+    exit() { clearInterval(adTimer); $('adWrap').hidden = true; },
     update() {},
     render(ctx) { drawRoom(ctx, LW, LH, st.lastWalk ? st.lastWalk.weather : 'sunny'); },
   };
+  /* 저녁 산책: 모의 광고(3초 후 닫기) → 짧은 저녁 산책 */
+  let adTimer = 0;
+  $('rEve').addEventListener('click', () => {
+    $('adWrap').hidden = false; $('adClose').disabled = true;
+    let n = 3; $('adCount').textContent = n + '초 후 닫을 수 있어요';
+    clearInterval(adTimer);
+    adTimer = setInterval(() => {
+      n -= 1;
+      if (n > 0) { $('adCount').textContent = n + '초 후 닫을 수 있어요'; return; }
+      clearInterval(adTimer); $('adCount').textContent = '이제 닫을 수 있어요'; $('adClose').disabled = false;
+    }, 1000);
+  });
+  $('adClose').addEventListener('click', () => {
+    if ($('adClose').disabled) return;
+    $('adWrap').hidden = true; go('walk', { evening: true });
+  });
   function proceed(dest) {
     if (st.pendingEnding) go('ending', { id: st.pendingEnding, then: dest });
     else go(dest);
@@ -1023,7 +1145,7 @@
     enter() { this.build(); },
     build() {
       const grid = $('sGrid'); grid.innerHTML = '';
-      PG.ITEMS.filter((i) => !i.starter).forEach((it) => {
+      PG.ITEMS.filter((i) => !i.starter && !i.gift).forEach((it) => {
         const owned = st.owned.includes(it.id), on = st.equipped[it.slot] === it.id;
         const b = document.createElement('button');
         b.className = 'cell' + (on ? ' on' : '');
@@ -1113,6 +1235,7 @@
     if (e.target.closest && e.target.closest('button')) return;
     const w = scenes.walk.w;
     if (!w || w.done) return;
+    if (w.mode === 'heart') { heartTap(w); return; }   // 대화 중: 탭만 받고 홀드·스와이프 무시
     Object.assign(inp, { down: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), swiped: false, consumed: false });
     setHeld(w, true);
   });
