@@ -61,7 +61,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   function josa(word, pair) {
     const ch = word.charCodeAt(word.length - 1);
-    const has = ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 > 0;
+    const has = ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 > 0 && !(pair === '으로/로' && (ch - 0xac00) % 28 === 8);
     const p = pair.split('/');
     return word + (has ? p[0] : p[1]);
   }
@@ -1542,7 +1542,7 @@
       const can = this.snack || st.coins >= PG.SNACK_COST;
       $('mSnack').classList.toggle('on', this.snack); $('mSnack').disabled = !can;
       $('mSnackSub').textContent = PG.SNACK_COST + '코인 · 파볼 기회 +1' + (can ? '' : ' (코인 부족)');
-      $('mGo').textContent = DEST[this.sel].name + '로 보내기';
+      $('mGo').textContent = josa(DEST[this.sel].name, '으로/로') + ' 보내기';
       $('mBack').hidden = eve;
     },
     async send() {
