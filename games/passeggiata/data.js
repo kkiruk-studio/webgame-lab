@@ -144,6 +144,59 @@
     { id: 'f_alley1', cond: { type: 'route', route: 'alley', min: 2 }, text: '뒷골목 벽에 분필로 그린 하트가 빗물에도 지워지지 않았다.' },
     { id: 'f_alley_rain', cond: { type: 'alleyRain', min: 1 }, text: '비 오는 뒷골목, 처마 밑에 둘이 서 있던 자리. 그는 잠깐 멈췄다가 걸었다.' },
     { id: 'f_park1', cond: { type: 'route', route: 'park', min: 2 }, text: '공원 벤치의 동판에 새겨진 이름을 그는 읽지 않고도 안다.' },
+    /* source:'treasure' 는 보물을 파냈을 때만 해금(PG.TREASURES 의 frag). */
+    { id: 'f_ticket', source: 'treasure', text: '낡은 극장표 두 장. 같은 줄, 나란히 붙은 두 자리. 영화 제목은 기억나지 않는다. 옆자리는 기억난다.' },
+    { id: 'f_saucer', source: 'treasure', text: '엔조네 잔 받침. 뒷면에 두 사람 이니셜.' },
+    { id: 'f_brooch', source: 'treasure', text: '그녀가 잃어버렸다던 파란 브로치. 꽃집 앞 화단 흙 속에 있었다. 그동안 여기 있었구나.' },
+  ];
+
+  /* 일기장: 엔딩별 조각 묶음(힌트 표시용). 모든 조각이 정확히 한 묶음에 들어간다. */
+  PG.DIARY_GROUPS = [
+    { ending: 'clock', frags: ['f_tie', 'f_sofia1', 'f_promise'] },
+    { ending: 'blue', frags: ['f_marta1', 'f_marta2', 'f_brooch', 'f_ticket'] },
+    { ending: 'table', frags: ['f_enzo1', 'f_saucer', 'f_closet'] },
+    { ending: 'lead', frags: ['f_dog1', 'f_dog2', 'f_alley1', 'f_alley_rain', 'f_park1'] },
+  ];
+
+  /* ---------- 방치형 루프: 목적지 · 타이머 · 보물 ---------- */
+  /* 보내기 타이머 배율. 1 = 프로토(목적지별 25~40초).
+     실제 서비스는 60(=25~40분) ~ 180(=75분~2시간) 정도로 올릴 것. 바꾸는 곳은 여기 한 곳. */
+  PG.TIMER_SCALE = 1;
+  /* nbr: 'featured2'(오늘의 주인공 포함 2) | 'marta+1' | 'maybe1'(0~1) | 'sofia'
+     sniff = 냄새 자리 수(=파볼 후보 수의 상한), haz = 위험물 수, len = 리플레이 길이(px) */
+  PG.DESTS = [
+    { id: 'piazza', name: '광장', sec: 25, len: 880, nbr: 'featured2', sniff: 2, haz: 1, pool: '소품',
+      trait: '이웃 둘과 마주쳐요 · 보물은 소품', perk: '' },
+    { id: 'flowers', name: '꽃집 거리', sec: 30, len: 800, nbr: 'marta+1', sniff: 2, haz: 1, pool: '파란 것들',
+      trait: '마르타 확정 · 보물은 파란 것들', perk: '맑은 날 코인 +5' },
+    { id: 'alley', name: '뒷골목', sec: 40, len: 960, nbr: 'maybe1', sniff: 2, haz: 2, pool: '유물',
+      trait: '조용한 길 · 유물·사진(희귀 ×2)', perk: '비 오는 날 조각 ↑ · 사고 ↑' },
+    { id: 'park', name: '공원', sec: 35, len: 1000, nbr: 'sofia', sniff: 3, haz: 1, pool: '자연물',
+      trait: '소피아 확정 · 냄새 자리 3', perk: '강아지 기분 ↑' },
+  ];
+  PG.SNACK_COST = 5;
+
+  /* 보물. value = 중복일 때 코인 환산 기준(×2). frag = 파내면 해금되는 일기 조각.
+     이야기와 이어지는 보물은 희귀도 3. 아이콘은 sprites.js TREASURE_DEF 의 같은 id. */
+  PG.TREASURES = [
+    { id: 't_coin', name: '동전 한 닢', pool: '소품', rarity: 1, value: 1, desc: '분수대에서 튀어나온 동전. 누군가의 소원이었을까.' },
+    { id: 't_button', name: '단추', pool: '소품', rarity: 1, value: 1, desc: '코트에서 떨어진 단추. 그녀라면 바로 달아 줬을 텐데.' },
+    { id: 't_thimble', name: '골무', pool: '소품', rarity: 2, value: 3, desc: '은빛 골무. 그녀의 반짇고리에도 이런 게 있었다.' },
+    { id: 't_key', name: '작은 열쇠', pool: '소품', rarity: 2, value: 3, desc: '어느 서랍의 열쇠일까. 주머니에 넣어 두었다.' },
+    { id: 't_saucer', name: '잔 받침', pool: '소품', rarity: 3, value: 6, frag: 'f_saucer', desc: '엔조네 카페의 잔 받침. 뒷면에 두 사람 이니셜.' },
+    { id: 't_ribbon', name: '파란 리본', pool: '파란 것들', rarity: 1, value: 1, desc: '꽃다발에서 풀린 리본. 강아지가 물고 놓지 않았다.' },
+    { id: 't_marble', name: '파란 유리구슬', pool: '파란 것들', rarity: 2, value: 3, desc: '햇빛에 비추면 하늘이 한 알 들어 있다.' },
+    { id: 't_seed', name: '파란 꽃씨', pool: '파란 것들', rarity: 2, value: 3, desc: '봉투에 든 수레국화 씨앗. 창가 화분에 심어 볼까.' },
+    { id: 't_brooch', name: '파란 브로치', pool: '파란 것들', rarity: 3, value: 6, frag: 'f_brooch', desc: '그녀가 잃어버렸다던 바로 그 브로치.' },
+    { id: 't_oldcoin', name: '옛 리라 동전', pool: '유물', rarity: 1, value: 1, desc: '이젠 쓰지 않는 돈. 이걸로 커피 두 잔을 샀었다.' },
+    { id: 't_postcard', name: '빛바랜 엽서', pool: '유물', rarity: 2, value: 3, desc: '리비에라 엽서. 글씨는 번져서 읽을 수 없다.' },
+    { id: 't_hairpin', name: '머리핀', pool: '유물', rarity: 3, value: 6, frag: 'f_dog1', desc: '파란 꽃 장식 머리핀. 그는 한참을 들여다봤다.' },
+    { id: 't_photo', name: '사진 한 장', pool: '유물', rarity: 3, value: 6, frag: 'f_dog2', desc: '같은 벤치, 같은 모자, 그리고 웃고 있는 한 사람.' },
+    { id: 't_ticket', name: '낡은 극장표 두 장', pool: '유물', rarity: 3, value: 6, frag: 'f_ticket', desc: '나란히 붙은 두 자리.' },
+    { id: 't_pinecone', name: '솔방울', pool: '자연물', rarity: 1, value: 1, desc: '공원 소나무 아래에서. 아직 송진 냄새가 난다.' },
+    { id: 't_feather', name: '깃털', pool: '자연물', rarity: 1, value: 1, desc: '비둘기 깃털. 강아지가 자랑스럽게 가져왔다.' },
+    { id: 't_pebble', name: '매끈한 조약돌', pool: '자연물', rarity: 1, value: 1, desc: '손안에 쏙 들어온다. 주머니 속 부적.' },
+    { id: 't_clover', name: '네잎클로버', pool: '자연물', rarity: 2, value: 3, desc: '소피아에게 보여 주면 좋아하겠다.' },
   ];
 
   /* 해금 조각이 없는 날의 일상 문장 */
@@ -212,7 +265,7 @@
 
   PG.newSave = function (breed, name) {
     return {
-      v: 3,
+      v: 4,
       dog: { breed: breed, name: name },
       day: 1,
       coins: 30,
@@ -226,7 +279,7 @@
       pendingEnding: null,
       lastWalk: null,
       dogMood: 60,
-      routeCounts: { park: 0, cafe: 0, alley: 0 },
+      routeCounts: { park: 0, cafe: 0, alley: 0, piazza: 0, flowers: 0 },
       alleyRain: 0,
       gestKnown: {},
       wornCount: {},        // itemId -> 산책 완료 착용 횟수
@@ -234,6 +287,8 @@
       hersTieLast: 0,       // 위 카운트를 마지막으로 올린 day (하루 1회)
       heartSeen: [],        // 본 호감 이벤트 id
       eveningDay: 0,        // 저녁 산책을 한 day
+      out: null,            // 보내기 진행 중 {dest, snack, seed, startAt, endAt, weather, day, evening}
+      treasures: {},        // 보물 id -> 개수
     };
   };
 
@@ -252,7 +307,10 @@
     if (!s.equipped || typeof s.equipped !== 'object') s.equipped = Object.assign({}, d.equipped);
     // 이미 옷장 조각을 연 예전 세이브는 그녀의 넥타이를 받은 것으로
     if (s.unlockedFragments.includes('f_closet') && !s.owned.includes('tie_hers')) s.owned.push('tie_hers');
-    s.v = 3;
+    if (!s.treasures || typeof s.treasures !== 'object' || Array.isArray(s.treasures)) s.treasures = {};
+    const o = s.out;
+    if (o && (typeof o !== 'object' || !PG.DESTS.some((d) => d.id === o.dest) || typeof o.endAt !== 'number')) s.out = null;
+    s.v = 4;
     return s;
   };
 

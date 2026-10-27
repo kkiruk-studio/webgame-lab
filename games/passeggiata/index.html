@@ -11,7 +11,8 @@
 :root{
   --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
   --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
-  --padL:max(12px,var(--sal));--padR:max(12px,var(--sar));
+  --padL:max(10px,var(--sal));--padR:max(10px,var(--sar));--padB:max(var(--sab),8px);
+  --stageB:360px;--bandT:80px;--bandB:430px;   /* game.js resize() 가 실제 값으로 덮어씀 */
   --ink:#2b211c;--paper:#f4ead5;--paper2:#e9dcc0;--line:#cdbb97;--muted:#7a6a58;
   --terra:#b8592f;--terra2:#94451f;--olive:#5f6e34;--olive2:#4c5a29;--gold:#d9a93a;--navy:#2f3d5c;
 }
@@ -28,153 +29,209 @@ button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 /* 픽셀 보더 패널 */
 .panel{background:var(--paper);border:2px solid var(--ink);
   box-shadow:inset 0 0 0 2px var(--paper),inset 0 0 0 3px var(--line),3px 3px 0 rgba(43,33,28,.35)}
-.btn{border:2px solid var(--ink);background:var(--paper2);padding:7px 12px;font-weight:700;
+.btn{border:2px solid var(--ink);background:var(--paper2);padding:8px 12px;font-weight:700;
   box-shadow:inset -2px -2px 0 rgba(43,33,28,.18),inset 2px 2px 0 rgba(255,255,255,.45),2px 2px 0 rgba(43,33,28,.4)}
 .btn:active{transform:translate(1px,1px);box-shadow:inset 2px 2px 0 rgba(43,33,28,.2)}
 .btn.primary{background:var(--olive);color:#f6efdf}
 .btn.terra{background:var(--terra);color:#f6efdf}
-.btn.small{padding:4px 8px;font-size:12px}
+.btn.small{padding:5px 8px;font-size:12px}
+.btn.big{padding:12px 14px;font-size:15px}
 .btn:disabled{opacity:.45}
 .ui{position:absolute;inset:0;pointer-events:none}
 .ui>*{pointer-events:auto}
+/* 화면 아래쪽 시트(캔버스 무대 아래) / 전체 시트 */
+.sheet{position:absolute;left:var(--padL);right:var(--padR);top:calc(var(--stageB) + 4px);bottom:calc(var(--padB) + 4px);
+  display:flex;flex-direction:column;gap:6px;padding:8px 10px;min-height:0}
+.sheet.full{top:calc(var(--sat) + 40px)}
+.sheet.band{top:calc(var(--bandB) + 6px)}
+.scroll{flex:1;min-height:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.foot{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex:0 0 auto}
+.foot .spacer{flex:1}
+.foot .btn.grow{flex:1}
 
 /* HUD */
-#hud{position:absolute;top:calc(var(--sat) + 6px);left:var(--padL);right:var(--padR);height:28px;display:flex;gap:6px;align-items:center;z-index:5;pointer-events:none}
+#hud{position:absolute;top:calc(var(--sat) + 6px);left:var(--padL);right:var(--padR);height:28px;display:flex;gap:5px;align-items:center;z-index:5;pointer-events:none}
 #hud>*{pointer-events:auto}
-.chip{display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;background:rgba(244,234,213,.94);border:2px solid var(--ink);font-weight:700;font-size:12px}
+.chip{display:flex;align-items:center;gap:5px;height:26px;padding:0 8px;background:rgba(244,234,213,.94);border:2px solid var(--ink);font-weight:700;font-size:12px;white-space:nowrap}
 .chip img{width:14px;height:14px}
 #hud .spacer{flex:1}
 #bookBtn{width:32px;height:28px;padding:0;display:flex;align-items:center;justify-content:center}
 #bookBtn img{width:18px;height:18px}
-#timewrap{flex:1;max-width:360px;height:12px;border:2px solid var(--ink);background:rgba(244,234,213,.9);margin-left:6px}
+#timewrap{flex:1;min-width:40px;height:12px;border:2px solid var(--ink);background:rgba(244,234,213,.9)}
 #timebar{height:100%;width:100%;background:var(--olive);transition:none}
 #timebar.low{background:var(--terra)}
 
 /* 토스트 */
-#toast{position:absolute;left:50%;top:calc(var(--sat) + 42px);transform:translateX(-50%);max-width:min(78vw,560px);
+#toast{position:absolute;left:50%;top:calc(var(--sat) + 42px);transform:translateX(-50%);width:max-content;max-width:calc(100vw - 28px);
   padding:7px 12px;font-weight:600;text-align:center;z-index:8;pointer-events:none;opacity:0;transition:opacity .2s}
 #toast.on{opacity:1}
-body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;padding:4px 10px;font-size:12px}
 
-/* 걷기 프롬프트 */
-#prompt{position:absolute;right:calc(var(--padR) + 6px);bottom:calc(max(var(--sab),6px) + 8px);padding:8px 16px 10px;min-width:200px;max-width:min(72vw,440px);text-align:center;font-weight:800;font-size:15px;pointer-events:none}
-#prompt small{display:block;font-weight:700;font-size:12px;color:var(--muted);margin-top:2px}
-#promptBar{position:relative;height:6px;background:var(--paper2);border:1px solid var(--ink);margin-top:7px;width:100%}
+/* 걷기·리플레이 프롬프트(띠 아래) */
+#prompt{position:absolute;left:var(--padL);right:var(--padR);top:calc(var(--bandB) + 10px);padding:10px 14px 12px;text-align:center;font-weight:800;font-size:16px;pointer-events:none}
+#prompt small{display:block;font-weight:700;font-size:13px;color:var(--muted);margin-top:3px}
+#promptBar{position:relative;height:7px;background:var(--paper2);border:1px solid var(--ink);margin-top:8px;width:100%}
 #promptBar i{position:absolute;top:0;bottom:0;display:block}
 #pbFill{left:0;width:100%;background:var(--terra)}
 #pbZone{background:var(--olive)}
 #pbMark{top:-4px!important;bottom:-4px!important;width:3px;margin-left:-1px;background:var(--ink)}
+#rpBar{position:absolute;left:var(--padL);right:var(--padR);bottom:calc(var(--padB) + 8px);padding:8px 10px;display:flex;gap:8px;align-items:center}
+#rpInfo{flex:1;font-weight:700;font-size:12.5px;min-width:0}
+#walkHint{position:absolute;left:var(--padL);right:var(--padR);bottom:calc(var(--padB) + 8px);padding:8px 10px;font-size:12px;color:var(--muted);text-align:center;font-weight:700}
 /* 강아지 기분 칩 */
-#moodChip{gap:4px;padding:0 7px}
+#moodChip{gap:4px;padding:0 6px}
 #moodBar{display:flex;gap:1px}
 #moodBar i{display:block;width:5px;height:10px;border:1px solid var(--ink)}
 #moodBar i.on{background:var(--olive)}
 #moodChip.low #moodBar i.on{background:var(--terra)}
 
 /* 강아지 선택 */
-#ui-dog .wrap{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(100vw - var(--padL) - var(--padR)),640px);padding:14px 16px;text-align:center}
-#ui-dog h1{font-size:17px;margin:0 0 2px}
-#ui-dog p.sub{margin:0 0 10px;color:var(--muted);font-size:12px}
-.dogs{display:flex;gap:10px;justify-content:center}
-.dogcard{flex:1;max-width:180px;padding:8px 6px;border:2px solid var(--ink);background:var(--paper2)}
-.dogcard canvas{width:100%;height:72px;display:block}
+#ui-dog .wrap{text-align:center;justify-content:center}
+#ui-dog h1{font-size:18px;margin:0 0 2px}
+#ui-dog p.sub{margin:0 0 6px;color:var(--muted);font-size:12.5px}
+.dogs{display:flex;gap:8px;justify-content:center}
+.dogcard{flex:1;max-width:120px;padding:8px 4px;border:2px solid var(--ink);background:var(--paper2)}
+.dogcard canvas{width:100%;height:64px;display:block}
 .dogcard b{display:block;font-size:14px}
-.dogcard span{font-size:11px;color:var(--muted)}
+.dogcard span{font-size:10.5px;color:var(--muted)}
 .dogcard.on{background:#fff8e6;outline:3px solid var(--olive);outline-offset:-5px}
-.namerow{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:10px}
-.namerow input{font-size:16px;padding:6px 8px;border:2px solid var(--ink);background:#fffaf0;width:150px;border-radius:0;color:var(--ink)}
+.namerow{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:10px;flex-wrap:wrap}
+.namerow input{font-size:16px;padding:7px 8px;border:2px solid var(--ink);background:#fffaf0;width:140px;border-radius:0;color:var(--ink)}
 
 /* 옷장 */
-#wardPanel{position:absolute;top:calc(var(--sat) + 40px);bottom:calc(max(var(--sab),6px) + 4px);right:var(--padR);width:min(55%,500px);display:flex;flex-direction:column;padding:8px 10px;gap:6px}
-.inforow{display:flex;align-items:center;gap:8px;font-weight:700}
+.inforow{display:flex;align-items:center;gap:6px;font-weight:700;flex-wrap:wrap}
 .inforow img{width:18px;height:18px}
 .stars{color:var(--gold);letter-spacing:1px;font-size:14px;text-shadow:1px 1px 0 var(--ink)}
 .stars .off{color:#cdbb97;text-shadow:none}
 .hint{font-size:12px;background:#fff8e6;border:1px dashed var(--muted);padding:4px 7px;line-height:1.3}
-.tabs{display:flex;gap:3px}
-.tab{flex:1;padding:4px 0;font-size:11px;font-weight:700;border:2px solid var(--ink);background:var(--paper2)}
+.tabs{display:flex;gap:3px;flex:0 0 auto}
+.tab{flex:1;padding:6px 0;font-size:11px;font-weight:700;border:2px solid var(--ink);background:var(--paper2);min-width:0}
 .tab.on{background:var(--ink);color:var(--paper)}
-.grid{flex:1;min-height:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:5px;align-content:start}
-.cell{border:2px solid var(--ink);background:#fffaf0;padding:3px 2px;text-align:center;font-size:10.5px;line-height:1.15;position:relative;min-height:74px}
-.cell img{height:46px;max-width:100%;display:block;margin:0 auto 2px;image-rendering:pixelated}
+.grid{flex:1;min-height:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;align-content:start}
+.cell{border:2px solid var(--ink);background:#fffaf0;padding:3px 2px;text-align:center;font-size:11px;line-height:1.15;position:relative;min-height:78px}
+.cell img{height:48px;max-width:100%;display:block;margin:0 auto 2px;image-rendering:pixelated}
 .cell.on{background:#eef0d8;outline:2px solid var(--olive);outline-offset:-5px}
 .cell .tag{position:absolute;top:2px;right:2px;font-size:9px;background:var(--olive);color:#f6efdf;padding:0 3px}
 .cell.none{display:flex;align-items:center;justify-content:center;color:var(--muted)}
-.foot{display:flex;gap:6px;justify-content:flex-end;align-items:center}
-.foot .spacer{flex:1}
-#gearBtn{position:absolute;left:var(--padL);bottom:calc(max(var(--sab),6px) + 4px);width:26px;height:26px;padding:0;font-size:14px;opacity:.75;background:rgba(244,234,213,.85);border:2px solid var(--ink)}
-#gearMenu{position:absolute;left:var(--padL);bottom:calc(max(var(--sab),6px) + 36px);padding:8px;display:flex;flex-direction:column;gap:5px;z-index:9}
-
-/* 옷장: 점수 내역 · 테마 · 동네 소식 · 기억 */
+#gearBtn{position:absolute;left:var(--padL);top:calc(var(--sat) + 40px);width:28px;height:28px;padding:0;font-size:14px;opacity:.75;background:rgba(244,234,213,.85);border:2px solid var(--ink);z-index:6}
+#gearMenu{position:absolute;left:var(--padL);top:calc(var(--sat) + 72px);padding:8px;display:flex;flex-direction:column;gap:5px;z-index:9}
 .scorerow{display:flex;gap:4px;flex-wrap:wrap}
-.chip.mini{height:18px;padding:0 6px;font-size:10.5px;border-width:1px;gap:3px}
+.chip.mini{height:19px;padding:0 6px;font-size:10.5px;border-width:1px;gap:3px}
 .chip.mini.ok{background:#eef0d8}
 .theme{font-size:10.5px;font-weight:700;color:var(--terra2);border:1px solid var(--terra2);padding:0 4px;white-space:nowrap}
 .news{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-2px}
 .mem{color:var(--terra2);font-style:italic}
+#wDesc{font-size:11px;color:var(--muted);min-height:1.3em}
 
-/* 호감 이벤트 대화 */
-#dlg{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(var(--sab),6px) + 8px);width:min(78vw,520px);padding:8px 14px 9px;z-index:6}
-#dlg b{display:block;font-size:12px;color:var(--terra2)}
-#dlgText{display:block;font-size:14px;font-weight:600;min-height:1.4em;margin-top:2px}
-#dlg small{display:block;text-align:right;font-size:10px;color:var(--muted);animation:blink 1.4s steps(2) infinite}
-#streakBadge{margin-left:2px}
+/* 지도 */
+#mCards{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start}
+.dcard{border:2px solid var(--ink);background:#fffaf0;padding:6px 7px;text-align:left;display:flex;flex-direction:column;gap:3px;min-height:112px}
+.dcard.on{background:#eef0d8;outline:3px solid var(--olive);outline-offset:-6px}
+.dcard .dhead{display:flex;justify-content:space-between;align-items:baseline;gap:4px}
+.dcard .dhead b{font-size:14px}
+.dcard .dtime{font-size:11px;font-weight:700;color:var(--terra2);white-space:nowrap}
+.dcard .faces{display:flex;gap:3px;align-items:center;min-height:30px;font-size:10.5px;color:var(--muted)}
+.dcard .faces img{height:30px;image-rendering:pixelated}
+.dcard .dtrait{font-size:11px;line-height:1.25}
+.dcard .dperk{font-size:10.5px;color:var(--olive2);font-weight:700}
+.dcard .stars{font-size:12px}
+.toggle{display:flex;align-items:center;gap:8px;padding:8px 10px;border:2px solid var(--ink);background:var(--paper2);font-weight:700;text-align:left;flex:0 0 auto}
+.toggle i{display:inline-block;width:18px;height:18px;border:2px solid var(--ink);background:#fffaf0;flex:0 0 auto}
+.toggle.on i{background:var(--olive);box-shadow:inset 0 0 0 3px #fffaf0}
+.toggle small{color:var(--muted);font-weight:600}
+
+/* 대기(집) */
+#hWho{font-size:15px;font-weight:800}
+#hLeft{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;text-align:center;padding:6px 0}
+#hLeft.done{color:var(--olive2)}
+.btngrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+
+/* 파기 */
+#dSpots{display:flex;gap:8px;flex:0 0 auto}
+.spot{flex:1;min-width:0;min-height:150px;border:2px solid var(--ink);background:#fffaf0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;text-align:center}
+.spot img{width:64px;image-rendering:pixelated}
+.spot .q{font-size:24px;font-weight:800;color:var(--terra2);line-height:1}
+.spot small{font-size:11px;color:var(--muted)}
+.spot b{font-size:12.5px}
+.spot.dug{background:#eef0d8}
+.spot.gone{opacity:.4;background:var(--paper2)}
+.spot.digging{background:#fff3cf}
+.spot:disabled{color:inherit}
+#dDesc{font-size:12.5px}
 
 /* 모의 광고 */
 #adWrap{position:absolute;inset:0;z-index:20;background:rgba(43,33,28,.62);display:flex;align-items:center;justify-content:center}
-#adCard{width:min(80vw,420px);padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px;text-align:center}
+#adCard{width:min(86vw,420px);padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px;text-align:center}
 #adCard .adlab{align-self:flex-start;font-size:10px;font-weight:800;background:var(--muted);color:#f6efdf;padding:1px 5px}
-#adCard .adbox{border:2px dashed var(--muted);background:var(--paper2);padding:18px 8px;font-weight:700;color:var(--muted)}
+#adCard .adbox{border:2px dashed var(--muted);background:var(--paper2);padding:40px 8px;font-weight:700;color:var(--muted)}
 #adCount{font-size:12px;color:var(--muted)}
 
 /* 결산 */
-#resPanel{position:absolute;top:calc(var(--sat) + 40px);bottom:calc(max(var(--sab),6px) + 4px);left:var(--padL);right:var(--padR);padding:8px 10px;display:flex;gap:12px}
-.shot{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:center;min-width:0}
-.shot img{display:block;max-height:calc(100% - 40px);max-width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--ink)}
-.resinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.shot{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto}
+.shot img{display:block;width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--ink)}
+.shot img:not([src]){aspect-ratio:205/164;background:var(--paper2)}
+.resinfo{display:flex;flex-direction:column;gap:6px}
 .resinfo h2{margin:0;font-size:16px}
-.row{display:flex;justify-content:space-between;gap:6px;font-size:12.5px}
+.row{display:flex;justify-content:space-between;gap:6px;font-size:13px}
 .row b{font-variant-numeric:tabular-nums}
 .total{border-top:1px solid var(--line);padding-top:4px;font-weight:800}
-.nbrs{display:flex;flex-direction:column;gap:2px;font-size:12px}
+.nbrs{display:flex;flex-direction:column;gap:2px;font-size:12.5px}
 .hearts{color:#c8452f;letter-spacing:1px}
 .hearts .off{color:#cdbb97}
 .plus{color:var(--olive);font-weight:800}
 .badge{font-size:9.5px;font-weight:800;background:var(--olive);color:#f6efdf;padding:0 3px;margin-left:3px}
 .minus{color:var(--terra2)}
 .diary{font-size:12.5px;font-style:italic;background:#fff8e6;border-left:3px solid var(--terra);padding:5px 8px;line-height:1.4}
-.resinfo .foot{margin-top:auto}
+.sect{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1px;margin-top:2px}
+.trow{display:flex;gap:8px;align-items:center;background:#fffaf0;border:1px solid var(--line);padding:4px 6px}
+.trow img{width:36px;height:36px;image-rendering:pixelated;flex:0 0 auto}
+.trow div{min-width:0;font-size:12px;line-height:1.3}
+.trow small{color:var(--muted)}
+.talk{font-size:12px;line-height:1.35}
 
 /* 상점 */
-#shopPanel{position:absolute;top:calc(var(--sat) + 40px);bottom:calc(max(var(--sab),6px) + 4px);left:var(--padL);right:var(--padR);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
-#shopPanel .grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
-#shopPanel .cell{min-height:96px}
+#sGrid .cell{min-height:100px}
 .price{font-weight:800;color:var(--terra2)}
 .cell .st{color:var(--gold);font-size:10px}
 
-/* 엔딩 도감 */
-#endPanel{position:absolute;top:calc(var(--sat) + 40px);bottom:calc(max(var(--sab),6px) + 4px);left:var(--padL);right:var(--padR);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
-.ecards{flex:1;min-height:0;display:flex;gap:8px}
-.ecard{flex:1;min-width:0;border:2px solid var(--ink);background:#fffaf0;padding:6px;display:flex;flex-direction:column;gap:4px;overflow:hidden}
-.ecard img{width:100%;image-rendering:pixelated;border:2px solid var(--ink);display:block}
-.ecard b{font-size:13px}
-.ecard p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.3}
-.ecard .btn{margin-top:auto;align-self:flex-start}
+/* 도감(엔딩·보물·일기장) */
+.ecards{display:flex;flex-direction:column;gap:8px}
+.ecard{border:2px solid var(--ink);background:#fffaf0;padding:6px;display:flex;gap:8px;align-items:flex-start}
+.ecard img{width:46%;flex:0 0 auto;image-rendering:pixelated;border:2px solid var(--ink);display:block}
+.ecard .etx{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ecard b{font-size:13.5px}
+.ecard p{margin:0;font-size:12px;color:var(--muted);line-height:1.3}
 .ecard.locked{background:var(--paper2)}
+#bTre{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tcell{border:2px solid var(--ink);background:#fffaf0;padding:4px 2px;text-align:center;font-size:11px;line-height:1.2;min-height:92px;position:relative}
+.tcell img{width:52px;height:52px;display:block;margin:0 auto 2px;image-rendering:pixelated}
+.tcell.locked{background:var(--paper2);color:var(--muted)}
+.tcell .cnt{position:absolute;top:2px;right:3px;font-size:10px;font-weight:800;color:var(--terra2)}
+.tcell .stars{font-size:10px}
+#bDesc{font-size:12px;min-height:2.6em;background:#fff8e6;border:1px dashed var(--muted);padding:4px 7px}
+.dgroups{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.dline{margin:0 0 8px;font-size:13px;line-height:1.5;font-style:italic;border-left:3px solid var(--terra);padding:2px 8px;background:#fff8e6}
+.dline.locked{border-left-color:var(--line);background:transparent;font-style:normal}
+.dline .blk{color:#cdbb97;letter-spacing:-1px;word-break:break-all}
+.dline .dtag{display:block;font-style:normal;font-size:10px;font-weight:800;color:var(--muted);margin-bottom:1px}
 
 /* 엔딩 씬 */
-#ui-ending{background:#0d0b0a;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:calc(var(--sat) + 10px) var(--padR) calc(var(--sab) + 10px) var(--padL);color:#efe6cf}
-#ui-ending img{height:min(52vh,260px);image-rendering:pixelated;border:3px solid #efe6cf}
+#ui-ending{background:#0d0b0a;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(var(--sat) + 10px) var(--padR) calc(var(--sab) + 10px) var(--padL);color:#efe6cf}
+#ui-ending img{width:min(94vw,560px);height:auto;image-rendering:pixelated;border:3px solid #efe6cf}
 #eTitle{font-size:12px;letter-spacing:3px;color:#cdbb97}
-#eText{min-height:3.2em;max-width:min(86vw,620px);text-align:center;font-size:15px;line-height:1.55}
+#eText{min-height:4.8em;max-width:min(88vw,560px);text-align:center;font-size:15.5px;line-height:1.6}
 #eTap{font-size:11px;color:#8a7f68;animation:blink 1.4s steps(2) infinite}
 @keyframes blink{50%{opacity:.25}}
+#dlg{position:absolute;left:var(--padL);right:var(--padR);top:calc(var(--bandB) + 10px);padding:10px 14px 10px;z-index:6}
+#dlg b{display:block;font-size:12px;color:var(--terra2)}
+#dlgText{display:block;font-size:15px;font-weight:600;min-height:2.8em;margin-top:2px}
+#dlg small{display:block;text-align:right;font-size:10px;color:var(--muted);animation:blink 1.4s steps(2) infinite}
+#streakBadge{margin-left:2px}
 
-/* 세로 경고 */
+/* 가로 경고(세로가 정상) */
 #rotate{position:fixed;inset:0;z-index:50;background:#2b211c;color:#f4ead5;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:700;font-size:15px;text-align:center;touch-action:none}
-#rotate svg{width:96px;height:96px;shape-rendering:crispEdges}
-@media (orientation:portrait){#rotate{display:flex}}
-@media (prefers-reduced-motion:reduce){#eTap{animation:none}}
+#rotate svg{width:96px;height:96px;shape-rendering:crispEdges;transform:rotate(-90deg)}
+@media (orientation:landscape){#rotate{display:flex}}
+@media (prefers-reduced-motion:reduce){#eTap,#dlg small{animation:none}}
 </style>
 </head>
 <body>
@@ -186,87 +243,119 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
   <div id="timewrap" hidden><div id="timebar"></div></div>
   <div class="chip" id="moodChip" hidden aria-label="강아지 기분"><span aria-hidden="true">🐾</span><span id="moodBar"><i></i><i></i><i></i><i></i></span><span class="badge" id="streakBadge" hidden>×2</span></div>
   <div class="spacer"></div>
-  <button class="btn" id="bookBtn" aria-label="엔딩 도감"><img class="px" id="bookImg" alt=""></button>
+  <button class="btn" id="bookBtn" aria-label="도감"><img class="px" id="bookImg" alt=""></button>
 </div>
 
 <div class="ui" data-scene="dog" id="ui-dog" hidden>
-  <div class="wrap panel">
+  <div class="wrap panel sheet band">
     <h1>Passeggiata — 신사의 산책</h1>
-    <p class="sub">매일 아침, 가장 멋진 모습으로. 함께 걸을 강아지를 골라주세요.</p>
+    <p class="sub">매일 아침, 가장 멋진 모습으로.<br>함께 걸을 강아지를 골라주세요.</p>
     <div class="dogs" id="dogCards"></div>
     <div class="namerow">
       <label for="dogName">이름</label>
       <input id="dogName" maxlength="10" autocomplete="off" placeholder="Bruno">
-      <button class="btn primary" id="dogStart">산책 시작</button>
+      <button class="btn primary big" id="dogStart">시작하기</button>
     </div>
   </div>
 </div>
 
 <div class="ui" data-scene="wardrobe" id="ui-wardrobe" hidden>
-  <div id="wardPanel" class="panel">
+  <div id="wardPanel" class="panel sheet">
     <div class="inforow"><img class="px" id="wIcon" alt=""><span id="wWeather">맑음</span><span class="theme" id="wTheme"></span><span style="color:var(--muted);font-weight:600">· 오늘의 코디</span><span class="stars" id="wStars"></span></div>
     <div class="scorerow" id="wScore"></div>
     <div class="hint" id="wHint"></div>
     <div class="news" id="wNews"></div>
     <div class="tabs" id="wTabs"></div>
     <div class="grid" id="wGrid"></div>
-    <div class="foot"><span id="wDesc" style="font-size:11px;color:var(--muted);flex:1;min-width:0"></span><button class="btn" id="wShop">상점</button><button class="btn primary" id="wGo">산책 나가기</button></div>
-  </div>
-  <button class="btn" id="gearBtn" aria-label="테스트 메뉴">⚙</button>
-  <div id="gearMenu" class="panel" hidden>
-    <button class="btn small" id="tCoins">테스트: 코인 +200</button>
-    <button class="btn small" id="tBoost">테스트: 호감·발견 +2</button>
-    <button class="btn small terra" id="tReset">진행 초기화</button>
+    <div id="wDesc"></div>
+    <div class="foot"><button class="btn big" id="wShop">상점</button><button class="btn primary big grow" id="wGo">산책 나가기</button></div>
   </div>
 </div>
 
-<div class="ui" data-scene="walk" id="ui-walk" hidden>
+<div class="ui" data-scene="map" id="ui-map" hidden>
+  <div id="mapPanel" class="panel sheet">
+    <div class="inforow"><span id="mTitle">어디로 보낼까요?</span></div>
+    <div class="scroll"><div id="mCards"></div></div>
+    <button class="toggle" id="mSnack"><i></i><span>간식 챙기기 <small id="mSnackSub">5코인 · 파볼 기회 +1</small></span></button>
+    <div class="foot"><button class="btn big" id="mBack">옷장으로</button><button class="btn primary big grow" id="mGo">보내기</button></div>
+  </div>
+</div>
+
+<div class="ui" data-scene="home" id="ui-home" hidden>
+  <div id="homePanel" class="panel sheet">
+    <div id="hWho"></div>
+    <div id="hSub" style="font-size:12px;color:var(--muted)"></div>
+    <div id="hLeft">00:00</div>
+    <div class="scroll"></div>
+    <div class="btngrid"><button class="btn" id="hShop">상점</button><button class="btn" id="hBook">도감</button><button class="btn" id="hDiary">일기장</button></div>
+    <button class="btn terra big" id="hAd">바로 돌아오기 (광고 보기)</button>
+    <button class="btn primary big" id="hGreet" hidden>맞이하기</button>
+  </div>
+</div>
+
+<div class="ui" data-scene="walk replay" id="ui-walk" hidden>
   <div id="prompt" class="panel" hidden><span id="promptText">인사하기</span><small id="promptSub"></small><div id="promptBar"><i id="pbFill"></i><i id="pbZone"></i><i id="pbMark"></i></div></div>
   <div id="dlg" class="panel" hidden><b id="dlgName"></b><span id="dlgText"></span><small>탭하여 계속</small></div>
+  <div id="walkHint" class="panel">누르고 있으면 줄 당기기 · 떼면 자유롭게 · 위/아래로 밀어 인사</div>
+  <div id="rpBar" class="panel"><span id="rpInfo">귀가 리플레이</span><button class="btn" id="rpSkip">건너뛰기 ▶▶</button></div>
+</div>
+
+<div class="ui" data-scene="dig" id="ui-dig" hidden>
+  <div id="digPanel" class="panel sheet band">
+    <div class="inforow"><span id="dTitle"></span></div>
+    <div id="dSub" style="font-size:12px;color:var(--muted)"></div>
+    <div id="dSpots"></div>
+    <div class="scroll"><div id="dDesc"></div></div>
+    <div class="foot"><button class="btn primary big grow" id="dNext" hidden>결산 보기</button></div>
+  </div>
 </div>
 
 <div class="ui" data-scene="result" id="ui-result" hidden>
-  <div id="resPanel" class="panel">
-    <div class="shot"><img id="rShot" alt="오늘의 한 컷"><button class="btn small" id="rShare">한 컷 공유</button></div>
-    <div class="resinfo">
-      <h2 id="rTitle">귀가</h2>
-      <div>
-        <div class="row"><span>길에서 주운 코인</span><b id="rPick">0</b></div>
-        <div class="row"><span>강아지의 발견</span><b id="rFind">0</b></div>
-        <div class="row"><span>코디 보너스 <span class="stars" id="rStars"></span></span><b id="rBonus">0</b></div>
-        <div class="row minus" id="rDirtRow" hidden><span>옷 더러워짐</span><b id="rDirt">−0★</b></div>
-        <div class="row total"><span>오늘 번 코인</span><b id="rTotal">0</b></div>
-        <div class="row" id="rRouteRow" hidden><span>경로</span><b id="rRoute"></b></div>
-        <div class="row" id="rMoodRow" hidden><span>강아지 기분</span><b id="rMood"></b></div>
+  <div id="resPanel" class="panel sheet full">
+    <div class="scroll">
+      <div class="shot"><img id="rShot" alt="오늘의 한 컷"></div>
+      <div class="resinfo">
+        <h2 id="rTitle">귀가</h2>
+        <div>
+          <div class="row"><span>길에서 주운 코인</span><b id="rPick">0</b></div>
+          <div class="row"><span>강아지의 발견</span><b id="rFind">0</b></div>
+          <div class="row"><span>코디 보너스 <span class="stars" id="rStars"></span></span><b id="rBonus">0</b></div>
+          <div class="row" id="rDupRow" hidden><span>중복 보물 → 코인</span><b id="rDup">0</b></div>
+          <div class="row minus" id="rDirtRow" hidden><span>옷 더러워짐</span><b id="rDirt">−0★</b></div>
+          <div class="row total"><span>오늘 번 코인</span><b id="rTotal">0</b></div>
+          <div class="row" id="rRouteRow" hidden><span>경로</span><b id="rRoute"></b></div>
+          <div class="row" id="rMoodRow" hidden><span>강아지 기분</span><b id="rMood"></b></div>
+        </div>
+        <div id="rTreBox" hidden><div class="sect">오늘의 보물</div><div id="rTre" style="display:flex;flex-direction:column;gap:4px"></div></div>
+        <div class="nbrs" id="rNbrs"></div>
+        <div id="rTalkBox" hidden><div class="sect">수다 조각</div><div class="talk" id="rTalk"></div></div>
+        <div class="diary" id="rDiary"></div>
       </div>
-      <div class="nbrs" id="rNbrs"></div>
-      <div class="diary" id="rDiary"></div>
-      <div class="foot"><button class="btn terra" id="rEve" hidden>저녁 산책 (광고 보기)</button><span class="spacer"></span><button class="btn" id="rShop">상점</button><button class="btn primary" id="rNext">내일 산책</button></div>
     </div>
-  </div>
-  <div id="adWrap" hidden>
-    <div id="adCard" class="panel">
-      <span class="adlab">모의 광고 · 실제 광고 아님</span>
-      <div class="adbox">여기에 광고가 재생됩니다</div>
-      <div id="adCount">3초 후 닫을 수 있어요</div>
-      <button class="btn primary" id="adClose" disabled>닫기</button>
-    </div>
+    <div class="foot"><button class="btn small" id="rShare">한 컷 공유</button><button class="btn terra small" id="rEve" hidden>저녁 산책 (광고)</button><span class="spacer"></span><button class="btn" id="rShop">상점</button><button class="btn primary big" id="rNext">내일 산책</button></div>
   </div>
 </div>
 
 <div class="ui" data-scene="shop" id="ui-shop" hidden>
-  <div id="shopPanel" class="panel">
-    <div class="inforow"><span>사르토리아 — 상점</span><span style="color:var(--muted);font-weight:600;font-size:11px">사면 바로 입어요</span></div>
+  <div id="shopPanel" class="panel sheet full">
+    <div class="inforow"><span>사르토리아 — 상점</span><span style="color:var(--muted);font-weight:600;font-size:11px" id="sNote">사면 바로 입어요</span></div>
     <div class="grid" id="sGrid"></div>
-    <div class="foot"><span id="sDesc" style="font-size:11px;color:var(--muted);flex:1"></span><button class="btn primary" id="sBack">옷장으로</button></div>
+    <div id="sDesc" style="font-size:11.5px;color:var(--muted);min-height:1.3em"></div>
+    <div class="foot"><button class="btn primary big grow" id="sBack">돌아가기</button></div>
   </div>
 </div>
 
 <div class="ui" data-scene="endings" id="ui-endings" hidden>
-  <div id="endPanel" class="panel">
-    <div class="inforow"><span>엔딩 도감</span><span style="color:var(--muted);font-weight:600;font-size:11px" id="eCount"></span></div>
-    <div class="ecards" id="eCards"></div>
-    <div class="foot"><button class="btn primary" id="eBack">돌아가기</button></div>
+  <div id="endPanel" class="panel sheet full">
+    <div class="inforow"><span>도감</span><span style="color:var(--muted);font-weight:600;font-size:11px" id="eCount"></span></div>
+    <div class="tabs" id="bTabs"><button class="tab" data-tab="end">엔딩</button><button class="tab" data-tab="tre">보물</button><button class="tab" data-tab="diary">일기장</button></div>
+    <div class="scroll" id="bBody">
+      <div class="ecards" id="eCards"></div>
+      <div id="bTreWrap"><div id="bTre"></div></div>
+      <div id="bDiary"></div>
+    </div>
+    <div id="bDesc" hidden></div>
+    <div class="foot"><button class="btn primary big grow" id="eBack">돌아가기</button></div>
   </div>
 </div>
 
@@ -275,6 +364,24 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
   <img id="eArt" alt="">
   <div id="eText"></div>
   <div id="eTap">탭하여 계속</div>
+</div>
+
+<button class="btn" id="gearBtn" aria-label="테스트 메뉴" hidden>⚙</button>
+<div id="gearMenu" class="panel" hidden>
+  <button class="btn small" id="tCoins">테스트: 코인 +200</button>
+  <button class="btn small" id="tBoost">테스트: 호감·발견 +2</button>
+  <button class="btn small" id="tDone">테스트: 타이머 즉시 완료</button>
+  <button class="btn small" id="tWalk">직접 산책(비교용)</button>
+  <button class="btn small terra" id="tReset">진행 초기화</button>
+</div>
+
+<div id="adWrap" hidden>
+  <div id="adCard" class="panel">
+    <span class="adlab">모의 광고 · 실제 광고 아님</span>
+    <div class="adbox">여기에 광고가 재생됩니다</div>
+    <div id="adCount">3초 후 닫을 수 있어요</div>
+    <button class="btn primary" id="adClose" disabled>닫기</button>
+  </div>
 </div>
 
 <div id="toast" class="panel"></div>
@@ -286,8 +393,8 @@ body:not([data-scene=walk]) #toast{top:calc(var(--sat) + 5px);max-width:52vw;pad
     <rect x="3" y="1" width="5" height="1" fill="#d9a93a"/><rect x="8" y="2" width="1" height="1" fill="#d9a93a"/><rect x="9" y="3" width="1" height="1" fill="#d9a93a"/><rect x="8" y="3" width="1" height="1" fill="#d9a93a"/><rect x="10" y="3" width="1" height="1" fill="#d9a93a"/>
     <rect x="12" y="14" width="1" height="1" fill="#d9a93a"/><rect x="7" y="14" width="5" height="1" fill="#d9a93a"/><rect x="6" y="13" width="1" height="1" fill="#d9a93a"/><rect x="5" y="13" width="1" height="1" fill="#d9a93a"/><rect x="6" y="12" width="1" height="1" fill="#d9a93a"/><rect x="6" y="14" width="1" height="1" fill="#d9a93a"/>
   </svg>
-  <div>가로로 돌려주세요</div>
-  <div style="font-size:12px;font-weight:600;color:#cdbb97">Passeggiata는 가로 화면 게임이에요</div>
+  <div>세로로 돌려주세요</div>
+  <div style="font-size:12px;font-weight:600;color:#cdbb97">Passeggiata는 세로 화면 게임이에요</div>
 </div>
 
 <script src="sprites.js"></script>

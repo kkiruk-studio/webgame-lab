@@ -6,8 +6,10 @@
   const PG = window.PG, S = PG.SPR;
   const $ = (id) => document.getElementById(id);
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const PORTRAIT = matchMedia('(orientation: portrait)');
-  const ITEM = {}, NB = {}, BREED = {}, END = {}, FRAG = {};
+  const LANDSCAPE = matchMedia('(orientation: landscape)');   // 세로가 정상, 가로면 루프 정지 + 회전 안내
+  const ITEM = {}, NB = {}, BREED = {}, END = {}, FRAG = {}, DEST = {}, TRE = {};
+  PG.DESTS.forEach((d) => (DEST[d.id] = d));
+  PG.TREASURES.forEach((t) => (TRE[t.id] = t));
   PG.ITEMS.forEach((i) => (ITEM[i.id] = i));
   PG.NEIGHBORS.forEach((n) => (NB[n.id] = n));
   PG.BREEDS.forEach((b) => (BREED[b.id] = b));
@@ -17,17 +19,40 @@
 
   /* ---------------- 캔버스 ---------------- */
   const cv = $('game'), cx = cv.getContext('2d');
-  const lo = S.mk(320, 180), lx = lo.getContext('2d');
-  let LW = 320, LH = 180, SC = 1, OX = 0, OY = 0;
+  /* 세로 화면: 논리 폭 ≈195px(정수 배율, 390pt 폰에서 CSS 2배), 높이는 화면 비율대로(≈420).
+     사이드스크롤 세계는 높이 BH 의 가로 띠(bandC)에 그린 뒤 BAND_Y 에 붙이고, 띠 위=하늘·아래=길 색으로 연장.
+     방 장면(옷장·대기·지도 등)은 상단 ROOM_H 무대에 그리고 아래는 HTML 시트. */
+  const lo = S.mk(195, 420), lx = lo.getContext('2d');
+  const BH = 176, ROOM_H = 180;
+  const bandC = S.mk(195, BH), bx = bandC.getContext('2d');
+  let LW = 195, LH = 420, SC = 1, OX = 0, OY = 0, BAND_Y = 40;
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
     cv.width = W; cv.height = H;
-    SC = Math.max(1, Math.floor(H / 172));
+    SC = Math.max(1, Math.floor(W / 195));
     LW = Math.ceil(W / SC); LH = Math.ceil(H / SC);
     lo.width = LW; lo.height = LH;
     lx.imageSmoothingEnabled = false;
+    bandC.width = LW; bandC.height = BH; bx.imageSmoothingEnabled = false;
+    BAND_Y = Math.max(20, Math.min(60, Math.round(LH * 0.1)));
     OX = -Math.floor((LW * SC - W) / 2); OY = -Math.floor((LH * SC - H) / 2);
+    const k = SC / dpr, rs = document.documentElement.style;
+    rs.setProperty('--bandT', Math.round(BAND_Y * k + OY / dpr) + 'px');
+    rs.setProperty('--bandB', Math.round((BAND_Y + BH) * k + OY / dpr) + 'px');
+    rs.setProperty('--stageB', Math.round(ROOM_H * k + OY / dpr) + 'px');
+  }
+  /* 띠(bandC)를 화면에 붙이고 위아래를 연장 */
+  function blitBand(ctx, top, bottom, tint) {
+    ctx.fillStyle = top; ctx.fillRect(0, 0, LW, BAND_Y);
+    ctx.drawImage(bandC, 0, BAND_Y);
+    ctx.fillStyle = bottom || '#5d5a56'; ctx.fillRect(0, BAND_Y + BH, LW, LH - BAND_Y - BH);
+    if (tint) { ctx.fillStyle = tint; ctx.fillRect(0, 0, LW, BAND_Y); ctx.fillRect(0, BAND_Y + BH, LW, LH - BAND_Y - BH); }
+  }
+  /* 방 무대(상단 ROOM_H) + 아래 어두운 바닥 */
+  function stage(ctx, weather) {
+    drawRoom(ctx, LW, ROOM_H, weather);
+    ctx.fillStyle = '#2b211c'; ctx.fillRect(0, ROOM_H, LW, LH - ROOM_H);
   }
   const lay = (H) => ({ yB: H - 42, yF: H - 13 });
 
@@ -292,6 +317,71 @@
     ctx.fillStyle = '#d9a441'; ctx.fillRect(Math.floor(W * 0.11) + 2, H - 14, Math.floor(W * 0.27) - 4, 1);
   }
 
+  /* 대기 화면: 작은 벽시계 (frac = 지난 비율 0..1) */
+  function drawClock(ctx, cx0, cy0, frac, sec) {
+    const R = 10;
+    for (let y = -R - 1; y <= R + 1; y++) for (let x = -R - 1; x <= R + 1; x++) {
+      const d = Math.hypot(x, y);
+      if (d > R + 1.2) continue;
+      ctx.fillStyle = d > R - 0.4 ? '#5a3a22' : '#f6efdf'; ctx.fillRect(cx0 + x, cy0 + y, 1, 1);
+    }
+    ctx.fillStyle = '#9a8a72';
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; ctx.fillRect(Math.round(cx0 + Math.sin(a) * (R - 2)), Math.round(cy0 - Math.cos(a) * (R - 2)), 1, 1); }
+    const hand = (a, len, col) => { ctx.fillStyle = col; for (let s = 0; s <= len; s += 0.5) ctx.fillRect(Math.round(cx0 + Math.sin(a) * s), Math.round(cy0 - Math.cos(a) * s), 1, 1); };
+    hand(frac * Math.PI * 2, R - 3, '#2b211c');
+    hand((sec % 60) / 60 * Math.PI * 2, R - 2, '#b8592f');
+    ctx.fillStyle = '#2b211c'; ctx.fillRect(cx0, cy0, 1, 1);
+  }
+  /* 동네 약도 (지도 장면 무대) */
+  const MAPPOS = { home: [0.5, 0.88], piazza: [0.5, 0.52], flowers: [0.17, 0.3], alley: [0.85, 0.62], park: [0.77, 0.2] };
+  function drawMap(ctx, W, H, sel, t) {
+    ctx.fillStyle = '#cdbb97'; ctx.fillRect(0, 0, W, H);
+    const x0 = 6, y0 = 20, mw = W - 12, mh = H - 26;
+    const P = (k) => [Math.round(x0 + MAPPOS[k][0] * mw), Math.round(y0 + MAPPOS[k][1] * mh)];
+    ctx.fillStyle = '#f4ead5'; ctx.fillRect(x0, y0, mw, mh);
+    const r = rng(77), cols = ['#e3c99a', '#ecd2a6', '#e7b98f', '#efe2c4'];
+    for (let i = 0; i < 34; i++) {
+      ctx.fillStyle = cols[i % 4];
+      ctx.fillRect(x0 + 3 + Math.floor(r() * (mw - 18)), y0 + 3 + Math.floor(r() * (mh - 14)), 7 + Math.floor(r() * 9), 5 + Math.floor(r() * 6));
+    }
+    const pk = P('park'); ctx.fillStyle = '#a9bd7a'; ctx.fillRect(pk[0] - 24, pk[1] - 16, 48, 30);
+    ctx.fillStyle = '#93ab5a'; for (let i = 0; i < 12; i++) ctx.fillRect(pk[0] - 22 + ((i * 13) % 44), pk[1] - 14 + ((i * 7) % 26), 2, 2);
+    const seg = (a, b) => [a, [a[0], b[1]], b];
+    const routes = { piazza: [P('home'), P('piazza')] };
+    ['flowers', 'alley', 'park'].forEach((k) => { routes[k] = [P('home')].concat(seg(P('piazza'), P(k))); });
+    ctx.fillStyle = '#b4a98f';
+    Object.keys(routes).forEach((k) => {
+      const pts = routes[k];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        ctx.fillRect(Math.min(a[0], b[0]) - 2, Math.min(a[1], b[1]) - 2, Math.abs(a[0] - b[0]) + 5, Math.abs(a[1] - b[1]) + 5);
+      }
+    });
+    // 고른 길: 행진하는 점선 + 걷는 점
+    if (sel && routes[sel]) {
+      const pts = routes[sel]; let dist = 0;
+      const off = REDUCED ? 0 : Math.floor(t * 12);
+      const all = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1], n = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+        for (let s2 = 0; s2 < n; s2++) {
+          const x = Math.round(a[0] + (b[0] - a[0]) * s2 / n), y = Math.round(a[1] + (b[1] - a[1]) * s2 / n);
+          all.push([x, y]);
+          if ((dist + off) % 6 < 3) { ctx.fillStyle = '#b8592f'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+          dist++;
+        }
+      }
+      if (all.length) { const q = all[Math.floor((t * 30) % all.length)]; ctx.fillStyle = '#2b211c'; ctx.fillRect(q[0] - 1, q[1] - 2, 3, 3); }
+    }
+    ['home', 'piazza', 'flowers', 'alley', 'park'].forEach((k) => {
+      const im = S.prop('m_' + k), p = P(k);
+      if (k === sel && Math.floor(t * 2) % 2 === 0) { ctx.fillStyle = '#d9a93a'; ctx.fillRect(p[0] - (im.width >> 1) - 2, p[1] - (im.height >> 1) - 2, im.width + 4, im.height + 4); }
+      ctx.drawImage(im, p[0] - (im.width >> 1), p[1] - (im.height >> 1));
+    });
+    ctx.fillStyle = '#2b211c';
+    ctx.fillRect(x0 - 1, y0 - 1, mw + 2, 1); ctx.fillRect(x0 - 1, y0 + mh, mw + 2, 1); ctx.fillRect(x0 - 1, y0, 1, mh); ctx.fillRect(x0 + mw, y0, 1, mh);
+  }
+
   /* ---------------- 오늘의 한 컷 ---------------- */
   function cropShot(src, gxS) {
     const w = Math.min(256, src.width), h = Math.min(144, src.height);
@@ -316,7 +406,7 @@
     x.fillStyle = '#2b211c';
     x.font = '700 ' + 9 * K / 1.5 * 1.1 + 'px -apple-system,"Apple SD Gothic Neo",sans-serif';
     x.textBaseline = 'middle';
-    x.fillText('Day ' + lw.day + (lw.evening ? ' · 저녁' : '') + ' · ' + PG.WEATHER[lw.weather].label + ' · ' + st.dog.name + '와 산책', bw * K, ty);
+    x.fillText('Day ' + lw.day + (lw.evening ? ' · 저녁' : '') + ' · ' + PG.WEATHER[lw.weather].label + (lw.dest && DEST[lw.dest] ? ' · ' + DEST[lw.dest].name : '') + ' · ' + josa(st.dog.name, '과/와') + ' 산책', bw * K, ty);
     x.font = 'italic 700 ' + 9 * K / 1.5 * 1.1 + 'px Georgia,serif';
     x.textAlign = 'right'; x.fillStyle = '#94451f';
     x.fillText('Passeggiata', c.width - bw * K, ty);
@@ -379,12 +469,17 @@
     sceneName = name; scene = scenes[name];
     document.body.dataset.scene = name;
     clearTimeout(toastTimer); $('toast').classList.remove('on');
-    document.querySelectorAll('.ui').forEach((el) => (el.hidden = el.dataset.scene !== name));
-    $('hud').hidden = !['wardrobe', 'walk', 'result', 'shop', 'endings'].includes(name);
-    $('bookBtn').hidden = name === 'walk' || name === 'endings';
-    $('timewrap').hidden = name !== 'walk';
-    $('moodChip').hidden = name !== 'walk';
+    document.querySelectorAll('.ui').forEach((el) => (el.hidden = !el.dataset.scene.split(' ').includes(name)));
+    const walky = name === 'walk' || name === 'replay';
+    $('hud').hidden = !['wardrobe', 'walk', 'replay', 'result', 'shop', 'endings', 'map', 'home', 'dig'].includes(name);
+    $('bookBtn').hidden = walky || name === 'endings';
+    $('timewrap').hidden = !walky;
+    $('moodChip').hidden = !walky;
+    $('rpBar').hidden = name !== 'replay';
+    $('walkHint').hidden = name !== 'walk';
+    $('gearBtn').hidden = !['wardrobe', 'map', 'home'].includes(name);
     $('gearMenu').hidden = true;
+    clearInterval(adTimer); $('adWrap').hidden = true; adDone = null;
     if (scene.enter) scene.enter(arg || {});
     updateHUD();
   }
@@ -393,7 +488,10 @@
   function updateHUD() {
     if (!st) return;
     const ww = scenes.walk && scenes.walk.w;
-    const d = sceneName === 'result' && st.lastWalk ? st.lastWalk.day : sceneName === 'walk' && ww && ww.evening ? ww.di.day : st.day;
+    const d = (sceneName === 'result' || sceneName === 'dig') && st.lastWalk ? st.lastWalk.day
+      : (sceneName === 'walk' || sceneName === 'replay') && ww && (ww.evening || ww.replay) ? ww.di.day
+      : sceneName === 'home' && st.out ? st.out.day
+      : sceneName === 'map' && scenes.map.eve ? scenes.map.day : st.day;
     $('hudDay').textContent = 'Day ' + d;
     $('hudCoins').textContent = st.coins;
   }
@@ -424,13 +522,13 @@
     update(dt) { this.t += dt; },
     render(ctx) {
       const camX = Math.floor(this.t * 14);
-      drawBase(ctx, LW, LH, camX, 'sunny', { t: this.t, seed: 2 });
-      const gx = Math.round(LW * 0.18);
+      drawBase(bx, LW, BH, camX, 'sunny', { t: this.t, seed: 2 });
+      const gx = Math.round(LW * 0.35);
       const f = Math.floor(this.t / 0.16) % 4;
-      const g = drawGent(ctx, LH, { shirt: 'shirt_white', pants: 'pants_grey', shoes: 'shoes_brown', hat: 'hat_borsalino' }, gx, f);
-      const d = drawDog(ctx, LH, this.sel, gx + 30, 'w' + (Math.floor(this.t / 0.12) % 4));
-      drawLeash(ctx, [g.hand[0] + 1, g.hand[1] + 1], d.neck);
-      ctx.fillStyle = 'rgba(43,33,28,0.35)'; ctx.fillRect(0, 0, LW, LH);
+      const g = drawGent(bx, BH, { shirt: 'shirt_white', pants: 'pants_grey', shoes: 'shoes_brown', hat: 'hat_borsalino' }, gx, f);
+      const d = drawDog(bx, BH, this.sel, gx + 30, 'w' + (Math.floor(this.t / 0.12) % 4));
+      drawLeash(bx, [g.hand[0] + 1, g.hand[1] + 1], d.neck);
+      blitBand(ctx, SKY.sunny[0]);
       PG.BREEDS.forEach((b) => {
         const c = this.cvs[b.id], x = c.getContext('2d');
         x.clearRect(0, 0, c.width, c.height);
@@ -452,7 +550,7 @@
   const TABS = PG.ALL_SLOTS;
   scenes.wardrobe = {
     tab: 'hat',
-    enter() { this.t = 0; this.di = dayInfo(st.day); this.build(); },
+    enter() { if (st.out) { go('home'); return; } this.t = 0; this.di = dayInfo(st.day); this.build(); },
     build() {
       const di = this.di, sc = outfitScore(st.equipped, di);
       $('wIcon').src = S.iconURL(di.weather === 'sunny' ? 'sun' : di.weather === 'cloudy' ? 'cloudi' : 'rain');
@@ -497,15 +595,15 @@
     },
     update(dt) { this.t += dt; },
     render(ctx) {
-      drawRoom(ctx, LW, LH, this.di.weather);
-      const big = this.big || (this.big = S.mk(80, 64)), bx = big.getContext("2d");
-      bx.clearRect(0, 0, 80, 64);
+      stage(ctx, this.di.weather);
+      const big = this.big || (this.big = S.mk(80, 64)), gb = big.getContext("2d");
+      gb.clearRect(0, 0, 80, 64);
       const tmpH = 64, f = Math.floor(this.t / 0.9) % 2 ? 5 : 4;
-      drawGent(bx, tmpH, st.equipped, 20, f);
+      drawGent(gb, tmpH, st.equipped, 20, f);
       const dogF = Math.floor(this.t / 1.6) % 4 === 3 ? 'w2' : 'w0';
-      drawDog(bx, tmpH, st.dog.breed, 50, dogF, st.equipped.dog);
-      const gx = Math.floor(LW * 0.16) - 40;
-      ctx.drawImage(big, gx, LH - 14 - (lay(tmpH).yF) * 2, 160, 128);
+      drawDog(gb, tmpH, st.dog.breed, 50, dogF, st.equipped.dog);
+      const gx = Math.floor(LW / 2) - 78;
+      ctx.drawImage(big, gx, ROOM_H - 14 - (lay(tmpH).yF) * 2, 160, 128);
     },
   };
   /* 아이템 설명 + 기억(두 번 이상 입은 옷, 선물은 처음부터) */
@@ -524,7 +622,7 @@
   const ICONS = {};
   function iconFor(id) { const k = id + st.dog.breed; return ICONS[k] || (ICONS[k] = S.itemIconURL(id, st.dog.breed)); }
   $('wShop').addEventListener('click', () => go('shop'));
-  $('wGo').addEventListener('click', () => go('walk'));
+  $('wGo').addEventListener('click', () => go('map'));
   $('gearBtn').addEventListener('click', () => { $('gearMenu').hidden = !$('gearMenu').hidden; });
   $('tCoins').addEventListener('click', async () => { st.coins += 200; await save(); updateHUD(); toast('테스트: 코인 +200'); });
   $('tBoost').addEventListener('click', async () => {
@@ -536,22 +634,58 @@
     if (!confirm('진행을 모두 초기화할까요?')) return;
     await PG.repo.reset(); st = null; location.hash = ''; go('dog');
   });
+  $('tDone').addEventListener('click', async () => {
+    $('gearMenu').hidden = true;
+    if (!st.out) { toast('지금 나가 있는 산책이 없어요'); return; }
+    st.out.endAt = Date.now(); await save(); toast('테스트: 타이머 즉시 완료');
+  });
+  $('tWalk').addEventListener('click', () => go('walk'));
 
   /* ---------- 3. 산책 ---------- */
   const SPEED = 26, DUR = 72, LEN = SPEED * DUR;
   const SEG_X = [0, 560, 1120];                 // 세그먼트 시작 gx (0=집앞, 1·2=갈림길에서 고름)
-  const ROUTE = { home: '집앞', park: '공원길', cafe: '카페 거리', alley: '뒷골목' };
+  const ROUTE = { home: '집앞', park: '공원길', cafe: '카페 거리', alley: '뒷골목', piazza: '광장', flowers: '꽃집 거리' };
   const GEST = { hat: '모자 인사', bow: '목례', talk: '대화', wave: '손 인사' };
   const NBR_IN = 90, NBR_OUT = 20;              // 인사 프롬프트 구간: gx ∈ [e.x-90, e.x-20]
   const ZONE_A = 58, ZONE_B = 34;               // 스윗존(눈 맞춤): gx ∈ [e.x-58, e.x-34]
   const MOOD_HELD = 2.5, MOOD_FREE = 1.5, MOOD_SNIFF = 12;
   function shuffle(a, r) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
   const EVE_LEN = 760, EVE_SPLIT = 380;           // 저녁 산책: 집앞 + 랜덤 1 세그먼트
+  /* 보내기(방치형) 관련: 목적지별 시드 · 이웃 · 코디 적합 */
+  function outSeed(day, eve, D) { return dayInfo(day).seed + (eve ? 5003 : 0) + PG.DESTS.indexOf(D) * 101; }
+  function destDI(D, day, eve) { return Object.assign({}, dayInfo(day), { seed: outSeed(day, eve, D) }); }
+  function destNeighbors(D, di) {
+    const ids = ['marta', 'enzo', 'sofia'], r = rng(di.seed * 3 + 17);
+    if (D.nbr === 'featured2') return di.neighbors.slice();
+    if (D.nbr === 'marta+1') return ['marta', di.featured !== 'marta' ? di.featured : ['enzo', 'sofia'][Math.floor(r() * 2)]];
+    if (D.nbr === 'sofia') return ['sofia'];
+    return r() < 0.5 ? [] : [ids[Math.floor(r() * 3)]];
+  }
+  function destFit(D, di) {
+    const sc = outfitScore(st.equipped, di), nb = destNeighbors(D, di);
+    const favs = nb.filter((id) => isFav(id, st.equipped)).length;
+    const score = sc.weather + favs * 3;
+    return { score, favs, weather: sc.weather, stars: clamp(1 + Math.floor((score + 1) / 2), 1, 5) };
+  }
+  function outMs(D, eve) { return Math.round(D.sec * PG.TIMER_SCALE * (eve ? 0.5 : 1) * 1000); }
+  function makeOut(destId, eve, snack) {
+    const D = DEST[destId], day = eve && st.lastWalk ? st.lastWalk.day : st.day, now = Date.now();
+    return { dest: D.id, snack: !!snack, seed: outSeed(day, eve, D), startAt: now, endAt: now + outMs(D, eve),
+      weather: dayInfo(day).weather, day, evening: !!eve };
+  }
   function makeWalk(opts) {
-    const eve = !!(opts && opts.evening);
-    const base = dayInfo(eve && st.lastWalk ? st.lastWalk.day : st.day);
-    const di = eve ? Object.assign({}, base, { seed: base.seed + 5003 }) : base;
-    const len = eve ? EVE_LEN : LEN;
+    opts = opts || {};
+    const out = opts.out || null;
+    const eve = out ? !!out.evening : !!opts.evening;
+    let di, len;
+    if (out) {
+      di = Object.assign({}, dayInfo(out.day), { weather: out.weather, seed: out.seed });
+      len = DEST[out.dest].len;
+    } else {
+      const base = dayInfo(eve && st.lastWalk ? st.lastWalk.day : st.day);
+      di = eve ? Object.assign({}, base, { seed: base.seed + 5003 }) : base;
+      len = eve ? EVE_LEN : LEN;
+    }
     const m = typeof st.dogMood === 'number' ? st.dogMood : 60;
     const w = { di, evening: eve, len, sky: eve ? 'dusk' : null, streak: 0, badgeN: -1, hop: 0, dust: null, tug: 0,
       heart: null, heartPending: null, dlgI: 0, dlgAt: 0, hersTie: false, t: 0, gx: 0, mode: 'walk', mt: 0, anim: 0, dogOff: 30, dogAnim: 0, dogState: 'walk', dogT: 0,
@@ -561,6 +695,22 @@
       dirt: 0, route: ['home'], dogBubble: null, hintT: 0, moodCells: -1, gest: null, greetDur: 2, promptAt: 0,
       segs: [{ x0: 0, x1: SEG_X[1], type: 'home' }, { x0: SEG_X[1], x1: SEG_X[2], type: null }, { x0: SEG_X[2], x1: LEN + 800, type: null }],
       forks: [], nbrPool: [] };
+    if (out) {
+      /* 귀가 리플레이: 집앞(짧게) + 목적지 한 구간, 갈림길 없음 */
+      const D = DEST[out.dest];
+      Object.assign(w, { replay: true, dest: D, out, digSpots: [], hearts: [], route: ['home', D.id], waiting: false, waitT: 0 });
+      w.segs = [{ x0: 0, x1: 240, type: 'home' }, { x0: 240, x1: len + 800, type: D.id }];
+      w.nbrPool = destNeighbors(D, di);
+      buildSeg(w, 0, 'home'); buildSeg(w, 1, D.id);
+      const r = rng(out.seed + 4242);   // 줄 AI: 냄새 자리·위험물마다 70% 성공을 미리 굴림
+      w.events.forEach((e) => (e.aiOk = r() < 0.7));
+      w.hazards.forEach((h) => (h.aiOk = r() < 0.7));
+      const sn = w.events.filter((e) => e.type === 'sniff');
+      if (sn.length && !sn.some((e) => e.aiOk)) sn[0].aiOk = true;   // 파볼 자리 최소 1곳 보장
+      if (D.id === 'park') w.mood = Math.min(100, w.mood + 15);
+      if (di.weather === 'rain') for (let i = 0; i < 80; i++) w.rain.push({ x: Math.random() * 600, y: Math.random() * 200, s: 140 + Math.random() * 60 });
+      return w;
+    }
     if (eve) {
       const r = rng(di.seed + 77), others = ['marta', 'enzo', 'sofia'].filter((id) => id !== di.featured);
       w.segs = [{ x0: 0, x1: EVE_SPLIT, type: 'home' }, { x0: EVE_SPLIT, x1: len + 800, type: null }];
@@ -588,7 +738,9 @@
     const r = rng(w.di.seed * 13 + si * 101 + type.charCodeAt(0) * 7);
     const ri = (a, b) => a + Math.floor(r() * (b - a + 1));
     let nN, nS, nH;
-    if (w.evening) { nN = type === 'home' ? 1 : 0; nS = 1; nH = type === 'home' ? 0 : 1; } // 저녁: 이웃1·냄새2·위험물1
+    if (w.dest) {
+      if (type === 'home') { nN = 0; nS = 0; nH = 0; } else { nN = w.nbrPool.length; nS = w.dest.sniff; nH = w.dest.haz; }
+    } else if (w.evening) { nN = type === 'home' ? 1 : 0; nS = 1; nH = type === 'home' ? 0 : 1; } // 저녁: 이웃1·냄새2·위험물1
     else if (type === 'home') { nN = 1; nS = 1; nH = 1; }
     else if (type === 'park') { nN = 0; nS = 2; nH = 1; }
     else if (type === 'cafe') { nN = ri(1, 2); nS = ri(0, 1); nH = 0; }
@@ -601,7 +753,7 @@
     shuffle(items, r);
     if (type === 'home') items.sort((a, b) => (a.k === 'h' ? 0 : 1) - (b.k === 'h' ? 0 : 1)); // 집앞은 위험물부터(연습)
     const start = x0 + (si === 0 ? 150 : 100), span = x1 - 50 - start, n = items.length;
-    const sprops = type === 'park' ? ['bush', 'fountain'] : type === 'alley' ? ['lamp', 'bush'] : ['bush', 'lamp', 'fountain'];
+    const sprops = type === 'park' || type === 'piazza' ? ['bush', 'fountain'] : type === 'alley' ? ['lamp', 'bush'] : type === 'flowers' ? ['bush'] : ['bush', 'lamp', 'fountain'];
     items.forEach((it, i) => {
       const x = Math.round(start + (span * (i + 0.5)) / n + r() * 24 - 12);
       if (it.k === 'n') w.events.push({ type: 'nbr', id: it.id, x, done: false, bubble: 'dots', bt: 0 });
@@ -664,6 +816,7 @@
   function stepWalk(w, dt) {
     if (w.done) return;
     w.t += dt;
+    if (w.replay) replayAI(w);
     let moving = false;
     const next = w.events.find((e) => !e.done);
     switch (w.mode) {
@@ -691,8 +844,17 @@
         if (w.mt >= 1.6) resolveSniff(w);
         break;
       case 'nbrPrompt': {
-        w.gx += SPEED * dt; moving = true; w.mt += dt;
         const e = w.cur;
+        if (w.replay) {
+          /* 리플레이: 스윗존 한가운데서 멈추고 플레이어의 인사를 기다림(대기 시간은 scenes.replay.update 가 실시간으로 셈) */
+          const stopX = e.x - (ZONE_A + ZONE_B) / 2;
+          if (!w.waiting) {
+            w.gx = Math.min(stopX, w.gx + SPEED * dt); moving = true;
+            if (w.gx >= stopX) { w.waiting = true; w.waitT = 0; w.promptAt = performance.now(); moving = false; showReplayPrompt(e); }
+          }
+          break;
+        }
+        w.gx += SPEED * dt; moving = true; w.mt += dt;
         setBar('timing', clamp(((w.gx - (e.x - NBR_IN)) / (NBR_IN - NBR_OUT)) * 100, 0, 100));
         if (w.gx >= e.x - NBR_OUT) { e.done = true; w.mode = 'walk'; hidePrompt(); }
         break;
@@ -757,7 +919,7 @@
     w.sparks.forEach((s) => (s.life -= dt));
     w.sparks = w.sparks.filter((s) => s.life > 0);
     w.events.forEach((e) => { if (e.bt > 0) e.bt -= dt; });
-    if (w.rain.length) w.rain.forEach((d) => { d.y += d.s * dt; d.x -= 30 * dt; if (d.y > LH) { d.y = -4; d.x = Math.random() * (LW + 40); } if (d.x < -4) d.x += LW + 20; });
+    if (w.rain.length) w.rain.forEach((d) => { d.y += d.s * dt; d.x -= 30 * dt; if (d.y > BH) { d.y = -4; d.x = Math.random() * (LW + 40); } if (d.x < -4) d.x += LW + 20; });
     $('timebar').style.width = clamp((1 - w.gx / w.len) * 100, 0, 100) + '%';
     $('timebar').classList.toggle('low', w.gx > w.len - 10 * SPEED);
     if (w.streak !== w.badgeN) { w.badgeN = w.streak; $('streakBadge').hidden = w.streak < 2; $('streakBadge').textContent = '×' + w.streak; }
@@ -766,12 +928,35 @@
     if (cells !== w.moodCells) { w.moodCells = cells; document.querySelectorAll('#moodBar i').forEach((el, i) => el.classList.toggle('on', i < cells)); }
     $('moodChip').classList.toggle('low', w.mood < 25);
     if (w.hintT > 0) { w.hintT -= dt; if (w.hintT <= 0 && w.mode === 'walk') hidePrompt(); }
-    if (DEBUG.autoTap) {
-      w.held = false;
+    if (DEBUG.autoTap || w.auto) {
+      if (!w.replay) w.held = false;
       if (w.mode === 'fork') chooseRoute(w, 0);
       else if (w.mode === 'heart') heartTap(w, true);
-      else if (w.mode === 'nbrPrompt' && w.gx >= w.cur.x - ZONE_A) walkGesture(w, NB[w.cur.id].gesture);
+      else if (w.mode === 'nbrPrompt') {
+        if (w.replay) { if (w.waiting) replayAutoGreet(w); }
+        else if (w.gx >= w.cur.x - ZONE_A) walkGesture(w, NB[w.cur.id].gesture);
+      }
     }
+  }
+  /* 리플레이 줄 AI: 냄새 자리 앞에서 놓고 위험물 앞에서 당김(각각 미리 굴린 70% 성공) */
+  function replayAI(w) {
+    if (w.mode !== 'walk' && w.mode !== 'nbrPrompt') { if (w.held) setHeld(w, false); return; }
+    const dogX = w.gx + w.dogOff;
+    const hz = w.hazards.find((h) => !h.done && h.x - dogX < 40 && h.x - dogX > -4);
+    const sn = w.events.find((e) => !e.done && e.type === 'sniff' && e.x - dogX < 50 && e.x - dogX > -8);
+    const want = !!((hz && hz.aiOk) || (sn && !sn.aiOk));
+    if (want !== w.held) setHeld(w, want);
+  }
+  function showReplayPrompt(e) {
+    const n = NB[e.id], known = st.gestKnown && st.gestKnown[e.id];
+    const lab = (g, pre) => pre + GEST[g] + (known && n.gesture === g ? '★' : '');
+    showPrompt(n.name + '에게 인사할 차례',
+      lab(st.equipped.hat ? 'hat' : 'wave', '↑') + '  ' + lab('bow', '↓') + '  ' + lab('talk', '⏺길게 '), 'fill');
+  }
+  /* 무입력·건너뛰기: 선호하지 않는 제스처로 무난하게(+1) */
+  function replayAutoGreet(w) {
+    const pref = NB[w.cur.id].gesture;
+    walkGesture(w, pref === 'bow' ? (st.equipped.hat ? 'hat' : 'wave') : 'bow');
   }
   function chooseRoute(w, idx) {
     if (!w || w.mode !== 'fork') return;
@@ -783,9 +968,11 @@
   }
   function walkGesture(w, g) {
     if (!w || w.mode !== 'nbrPrompt') return;
+    if (w.replay && !w.waiting) return;
     if (g === 'hat' && !st.equipped.hat) g = 'wave';
     const e = w.cur;
     hidePrompt();
+    if (w.replay) { w.waiting = false; startGreet(w, g, true); return; }
     startGreet(w, g, w.gx >= e.x - ZONE_A && w.gx <= e.x - ZONE_B);
   }
   function startGreet(w, g, inZone) {
@@ -830,6 +1017,11 @@
     const sb = w.streak >= 2 ? w.streak : 0;
     if (sb) w.findCoins += sb;
     const tail = sb ? '  ·  연속 발견 ×' + w.streak + ' (+' + sb + ')' : '';
+    if (w.replay) {
+      w.digSpots.push({ prop: w.cur.prop });
+      toast(josa(st.dog.name, '이/가') + ' 킁킁… 여기 뭔가 묻혀 있다! (파볼 자리 ' + w.digSpots.length + ')' + tail, 2200);
+      return;
+    }
     if (frag && Math.random() < (rich ? 0.95 : 0.75)) { w.frags.push(frag.id); toast(frag.text + tail, 3400); }
     else if (Math.random() < (rich ? 0.9 : 0.6)) { const v = (rich ? 6 : 4) + Math.floor(Math.random() * (rich ? 7 : 5)); w.findCoins += v; toast('강아지의 발견: 코인 뭉치 +' + v + tail); }
     else toast(josa(st.dog.name, '이/가') + ' 만족스럽게 킁킁거렸다.' + tail);
@@ -855,6 +1047,7 @@
     if (w.dlgI < h.lines.length) { $('dlgText').textContent = fillDog(h.lines[w.dlgI]); return; }
     $('dlg').hidden = true;
     if (!st.heartSeen.includes(h.id)) st.heartSeen.push(h.id);
+    if (w.hearts) w.hearts.push(h.id);
     if (h.frag && !st.unlockedFragments.includes(h.frag) && !w.frags.includes(h.frag)) w.frags.push(h.frag);
     w.heart = null; w.mode = 'walk';
   }
@@ -864,6 +1057,7 @@
     if (w.mode === 'heart') { heartTap(w); return; }
     if (w.mode === 'walk') w.smile = 0.6;
   }
+  const walky = () => sceneName === 'walk' || sceneName === 'replay';
   function walkSwipe(dir) {
     const w = scenes.walk.w;
     if (!w || w.done) return;
@@ -887,7 +1081,6 @@
       inp.down = false;
       this.w = makeWalk(arg); hidePrompt(); $('dlg').hidden = true;
       if (st.day === 1 && !this.w.evening) { showPrompt('누르고 있으면 줄 당기기 · 떼면 자유롭게', '', 'none'); this.w.hintT = 4; }
-      this.render(lx);
     },
     exit() { hidePrompt(); $('dlg').hidden = true; inp.down = false; },
     update(dt) {
@@ -899,10 +1092,18 @@
       while (left > 0 && !w.done) { const s = Math.min(left, 1 / 30); stepWalk(w, s); left -= s; }
       if (w.smile) w.smile = Math.max(0, w.smile - dt);
     },
-    render(ctx) { if (this.w) drawWalk(ctx, this.w); },
+    render(ctx) { if (this.w) renderWalk(ctx, this.w); },
   };
+  /* 세계를 띠(bandC)에 그리고 화면에 붙임 */
+  function renderWalk(ctx, w) {
+    drawWalk(bx, w);
+    const sky = SKY[w.sky || w.di.weather] || SKY.sunny;
+    blitBand(ctx, sky[0], '#5d5a56', w.evening ? 'rgba(90,60,90,0.12)' : w.rain.length ? 'rgba(60,70,90,0.12)' : null);
+    if (w.fade > 0) { ctx.fillStyle = 'rgba(43,33,28,' + w.fade + ')'; ctx.fillRect(0, 0, LW, LH); }
+  }
+  const GXS = 0.35;   // 화면 폭 대비 신사 위치
   function drawWalk(ctx, w) {
-    const W = LW, H = LH, L = lay(H), gxS = Math.round(W * 0.3), camX = Math.floor(w.gx) - gxS;
+    const W = LW, H = BH, L = lay(H), gxS = Math.round(W * GXS), camX = Math.floor(w.gx) - gxS;
     const weather = w.di.weather;
     drawBase(ctx, W, H, camX, weather, { sky: w.sky, t: w.t, events: w.events, seed: w.di.seed, door: w.door, segs: w.segs,
       avoid: w.forks.map((f) => f.x + 24).concat(w.hazards.map((h) => h.x)) });
@@ -994,7 +1195,7 @@
       w.rain.forEach((r) => ctx.fillRect(Math.round(r.x), Math.round(r.y), 1, 3));
     }
     if (w.wantShot) {
-      if (w.wantShot > w.shotScore) { w.shot = cropShot(lo, gxS); w.shotScore = w.wantShot; }
+      if (w.wantShot > w.shotScore) { w.shot = cropShot(bandC, gxS); w.shotScore = w.wantShot; }
       w.wantShot = 0;
     }
     if (w.fade > 0) { ctx.fillStyle = 'rgba(43,33,28,' + w.fade + ')'; ctx.fillRect(0, 0, W, H); }
@@ -1002,9 +1203,10 @@
 
   /* ---------- 결산 계산 ---------- */
   function finishWalk(w) {
-    const di = w.di, sc = outfitScore(st.equipped, di);
+    const di = w.di, sc = w.replay ? destFit(w.dest, di) : outfitScore(st.equipped, di);
     const stars = Math.max(1, sc.stars - Math.min(w.dirt, 2)), eve = !!w.evening;
-    const bonus = eve ? 0 : stars * 2 + (w.featuredFav ? 5 : 0);
+    const perk = w.replay && w.dest.id === 'flowers' && di.weather === 'sunny' ? 5 : 0;   // 맑은 꽃집 거리
+    const bonus = eve ? 0 : stars * 2 + (w.featuredFav ? 5 : 0) + perk;
     const total = w.earned + w.findCoins + bonus;
     st.coins += total;
     Object.keys(w.aff).forEach((k) => (st.affinity[k] += w.aff[k]));
@@ -1021,7 +1223,7 @@
     const newFr = w.frags.slice();
     w.frags.forEach((id) => st.unlockedFragments.push(id));
     PG.FRAGMENTS.forEach((f) => {
-      if (f.source === 'dog' || st.unlockedFragments.includes(f.id)) return;
+      if (f.source === 'dog' || f.source === 'treasure' || st.unlockedFragments.includes(f.id)) return;
       if (PG.evalCond(f.cond, st)) { st.unlockedFragments.push(f.id); newFr.push(f.id); }
     });
     let gift = null;
@@ -1033,28 +1235,74 @@
       const e = PG.ENDINGS.find((x) => !st.endingsSeen.includes(x.id) && PG.evalCond(x.cond, st));
       if (e) { st.endingsSeen.push(e.id); st.pendingEnding = e.id; }
     }
-    if (!w.shot) w.shot = cropShot(lo, Math.round(LW * 0.3));
+    if (!w.shot) { drawWalk(bx, w); w.shot = cropShot(bandC, Math.round(LW * GXS)); }
     st.lastWalk = {
       day: di.day, evening: eve, gift, weather: di.weather, stars, dirt: Math.min(w.dirt, 2), route: w.route.slice(), mood: st.dogMood,
       coins: { pick: w.earned, find: w.findCoins, bonus, total },
       aff: w.aff, greets: w.greets, dogFree: w.dogFreeGain, diary, newFrags: newFr,
       shot: w.shot.toDataURL('image/png'),
+      dest: w.replay ? w.dest.id : null, hearts: (w.hearts || []).slice(), snack: !!(w.out && w.out.snack), perk,
+      dig: w.replay ? { seed: w.out.seed, dest: w.dest.id, pool: w.dest.pool, weather: di.weather, picks: w.out.snack ? 2 : 1, used: 0,
+        spots: w.digSpots.map((sp) => ({ prop: sp.prop, st: 'hidden' })), done: !w.digSpots.length, found: [], dupCoins: 0 } : null,
     };
-    save().then(() => go('result'));
+    if (w.replay) st.out = null;
+    if (w.autoDig) autoDig();
+    save().then(() => go(w.replay && !w.autoDig ? 'dig' : 'result'));
+  }
+
+  /* ---------- 보물 파기 계산 ---------- */
+  function rollTreasure(dig, i) {
+    const r = rng(dig.seed * 31 + i * 7 + 5), pool = PG.TREASURES.filter((t) => t.pool === dig.pool);
+    const alley = dig.dest === 'alley';
+    const wt = { 1: 60, 2: 30, 3: 10 * (alley ? 2 : 1) * (alley && dig.weather === 'rain' ? 1.5 : 1) };
+    let x = r() * pool.reduce((a, t) => a + wt[t.rarity], 0);
+    for (const t of pool) { x -= wt[t.rarity]; if (x < 0) return t; }
+    return pool[pool.length - 1];
+  }
+  function digSpot(i) {
+    const lw = st.lastWalk, dig = lw && lw.dig, sp = dig && dig.spots[i];
+    if (!sp || sp.st !== 'hidden' || dig.done) return null;
+    const t = rollTreasure(dig, i), had = (st.treasures[t.id] || 0) > 0;
+    dig.used += 1; sp.st = 'dug'; sp.tid = t.id; sp.dup = had; sp.coins = 0; sp.frag = null;
+    st.treasures[t.id] = (st.treasures[t.id] || 0) + 1;
+    if (had) { sp.coins = t.value * 2; st.coins += sp.coins; dig.dupCoins += sp.coins; lw.coins.total += sp.coins; }
+    if (t.frag && !st.unlockedFragments.includes(t.frag)) {
+      st.unlockedFragments.push(t.frag); lw.newFrags.push(t.frag); lw.diary = FRAG[t.frag].text; sp.frag = t.frag;
+    }
+    dig.found.push(t.id);
+    if (dig.used >= Math.min(dig.picks, dig.spots.length)) {
+      dig.done = true;
+      dig.spots.forEach((s2) => { if (s2.st === 'hidden') s2.st = 'gone'; });
+    }
+    return sp;
+  }
+  function autoDig() {
+    const dig = st.lastWalk && st.lastWalk.dig;
+    if (!dig) return;
+    for (let i = 0; i < dig.spots.length && !dig.done; i++) digSpot(i);
+    dig.done = true;
   }
   /* 해시로 결산을 바로 열 때: 산책을 자동 시뮬레이션 (갈림길=첫 번째, 인사=스윗존에서 선호 제스처, 줄=free) */
-  function simulateWalk() {
-    const w = makeWalk(); scenes.walk.w = w;
+  function simulateWalk(w) {
+    w = w || makeWalk(); scenes.walk.w = w;
     const was = DEBUG.autoTap; DEBUG.autoTap = true;
     let guard = 0;
     while (!w.done && guard++ < 9000) {
       if (w.mode === 'home' && w.mt + 1 / 30 >= 1.5) break;
       stepWalk(w, 1 / 30);
-      if (w.wantShot || guard % 30 === 0) drawWalk(lx, w);
+      if (w.wantShot || guard % 30 === 0) drawWalk(bx, w);
     }
     DEBUG.autoTap = was;
-    hidePrompt();
+    hidePrompt(); $('dlg').hidden = true;
     return w;
+  }
+  /* 해시 직행용: 광장 보내기 → 즉시 귀가 → 자동 시뮬 (toResult 면 자동 파기 후 결산) */
+  function simulateOuting(toResult) {
+    st.out = makeOut('piazza', false, false);
+    const w = makeWalk({ out: st.out }); w.auto = true;
+    simulateWalk(w);
+    w.done = true; w.autoDig = !!toResult;
+    finishWalk(w);
   }
 
   /* ---------- 4. 결산 ---------- */
@@ -1063,8 +1311,8 @@
     enter() {
       const lw = st.lastWalk;
       if (!lw) { go('wardrobe'); return; }
-      $('rTitle').textContent = 'Day ' + lw.day + (lw.evening ? ' 저녁 산책 · ' : ' 귀가 · ') + PG.WEATHER[lw.weather].label;
-      $('adWrap').hidden = true;
+      $('rTitle').textContent = 'Day ' + lw.day + (lw.evening ? ' 저녁 산책 · ' : ' 귀가 · ') + PG.WEATHER[lw.weather].label +
+        (lw.dest && DEST[lw.dest] ? ' · ' + DEST[lw.dest].name : '');
       $('rEve').hidden = !!lw.evening || st.eveningDay === lw.day || !!st.pendingEnding;
       $('rPick').textContent = '+' + lw.coins.pick;
       $('rFind').textContent = '+' + lw.coins.find;
@@ -1083,6 +1331,24 @@
           heartsHTML(st.affinity[n.id]) + '</span> ' + (g ? '<span class="plus">+' + g + '</span>' : '<span style="color:var(--muted)">·</span>') +
           ((lw.greets || []).some((x) => x.id === n.id && x.perfect) ? '<span class="badge">완벽 인사</span>' : '') + '</span></div>';
       }).join('');
+      const dig = lw.dig;
+      $('rDupRow').hidden = !(dig && dig.dupCoins);
+      $('rDup').textContent = '+' + (dig ? dig.dupCoins : 0);
+      $('rTreBox').hidden = !dig;
+      if (dig) {
+        const got = dig.spots.filter((sp) => sp.st === 'dug');
+        $('rTre').innerHTML = got.length ? got.map((sp) => {
+          const t = TRE[sp.tid];
+          return '<div class="trow"><img src="' + S.treasureURL(t.id) + '" alt=""><div><b>' + t.name + '</b> <span class="stars" style="font-size:11px">' +
+            '★'.repeat(t.rarity) + '</span>' + (sp.dup ? ' <small>중복 → 코인 +' + sp.coins + '</small>' : ' <span class="badge">새 보물</span>') +
+            '<br><small>' + t.desc + '</small></div></div>';
+        }).join('') : '<div class="talk" style="color:var(--muted)">오늘은 빈손. ' + (dig.spots.length ? '' : josa(st.dog.name, '이/가') + ' 킁킁거린 자리가 없었다.') + '</div>';
+      }
+      const talks = (lw.hearts || []).map((id) => PG.HEART_EVENTS.find((h) => h.id === id)).filter(Boolean)
+        .map((h) => '<div>' + NB[h.who].name + ' · “' + fillDog(h.lines[h.lines.length - 1]) + '”</div>');
+      const nf = (lw.newFrags || []).length;
+      $('rTalkBox').hidden = !talks.length && !nf;
+      $('rTalk').innerHTML = talks.join('') + (nf ? '<div class="plus">일기장에 ' + nf + '줄이 채워졌다</div>' : '');
       $('rDiary').textContent = '일기 · ' + lw.diary;
       if (lw.gift && ITEM[lw.gift]) {
         const gl = document.createElement('span');
@@ -1097,11 +1363,12 @@
     },
     exit() { clearInterval(adTimer); $('adWrap').hidden = true; },
     update() {},
-    render(ctx) { drawRoom(ctx, LW, LH, st.lastWalk ? st.lastWalk.weather : 'sunny'); },
+    render(ctx) { stage(ctx, st.lastWalk ? st.lastWalk.weather : 'sunny'); },
   };
-  /* 저녁 산책: 모의 광고(3초 후 닫기) → 짧은 저녁 산책 */
-  let adTimer = 0;
-  $('rEve').addEventListener('click', () => {
+  /* 모의 광고(3초 후 닫기) → done() */
+  let adTimer = 0, adDone = null;
+  function showAd(done) {
+    adDone = done;
     $('adWrap').hidden = false; $('adClose').disabled = true;
     let n = 3; $('adCount').textContent = n + '초 후 닫을 수 있어요';
     clearInterval(adTimer);
@@ -1110,11 +1377,15 @@
       if (n > 0) { $('adCount').textContent = n + '초 후 닫을 수 있어요'; return; }
       clearInterval(adTimer); $('adCount').textContent = '이제 닫을 수 있어요'; $('adClose').disabled = false;
     }, 1000);
-  });
+  }
   $('adClose').addEventListener('click', () => {
     if ($('adClose').disabled) return;
-    $('adWrap').hidden = true; go('walk', { evening: true });
+    $('adWrap').hidden = true;
+    const f = adDone; adDone = null;
+    if (f) f();
   });
+  /* 저녁 산책: 광고 → 같은 보내기 루프를 dusk 로 한 번 더(타이머 절반) */
+  $('rEve').addEventListener('click', () => showAd(() => go('map', { evening: true })));
   function proceed(dest) {
     if (st.pendingEnding) go('ending', { id: st.pendingEnding, then: dest });
     else go(dest);
@@ -1142,7 +1413,7 @@
 
   /* ---------- 5. 상점 ---------- */
   scenes.shop = {
-    enter() { this.build(); },
+    enter() { $('sNote').textContent = st.out ? '산책 중 · 사면 옷장에 넣어둬요' : '사면 바로 입어요'; this.build(); },
     build() {
       const grid = $('sGrid'); grid.innerHTML = '';
       PG.ITEMS.filter((i) => !i.starter && !i.gift).forEach((it) => {
@@ -1158,43 +1429,291 @@
     },
     async buy(it) {
       $('sDesc').textContent = PG.SLOT_LABEL[it.slot] + ' · ' + it.name + ' — ' + (it.desc || '');
-      if (st.owned.includes(it.id)) { st.equipped[it.slot] = it.id; await save(); this.build(); toast(it.name + ' 착용'); return; }
+      if (st.owned.includes(it.id)) {
+        if (st.out) { toast('산책에서 돌아오면 갈아입을 수 있어요'); return; }
+        st.equipped[it.slot] = it.id; await save(); this.build(); toast(it.name + ' 착용'); return;
+      }
       if (st.coins < it.price) { toast('코인이 ' + (it.price - st.coins) + ' 부족해요'); return; }
-      st.coins -= it.price; st.owned.push(it.id); st.equipped[it.slot] = it.id;
+      st.coins -= it.price; st.owned.push(it.id);
+      if (!st.out) st.equipped[it.slot] = it.id;
       await save(); updateHUD(); this.build();
-      toast('구매 완료 · ' + it.name + '을(를) 옷장에 넣고 입었어요');
+      toast(st.out ? '구매 완료 · 옷장에 넣어 두었어요' : '구매 완료 · ' + it.name + '을(를) 옷장에 넣고 입었어요');
     },
     update() {},
-    render(ctx) { drawRoom(ctx, LW, LH, 'sunny'); ctx.fillStyle = 'rgba(43,33,28,0.25)'; ctx.fillRect(0, 0, LW, LH); },
+    render(ctx) { stage(ctx, 'sunny'); ctx.fillStyle = 'rgba(43,33,28,0.25)'; ctx.fillRect(0, 0, LW, LH); },
   };
-  $('sBack').addEventListener('click', () => go('wardrobe'));
+  $('sBack').addEventListener('click', () => go(st.out ? 'home' : 'wardrobe'));
 
   /* ---------- 6. 엔딩 도감 ---------- */
   scenes.endings = {
     enter(arg) {
       this.back = arg.back && arg.back !== 'endings' && arg.back !== 'ending' ? arg.back : (this.back || 'wardrobe');
-      if (this.back === 'walk' || this.back === 'dog') this.back = 'wardrobe';
+      if (['walk', 'dog', 'replay', 'dig'].includes(this.back)) this.back = 'wardrobe';
+      this.tab = arg.tab || this.tab || 'end';
+      this.buildEndings(); this.buildTre(); this.buildDiary(); this.showTab(this.tab);
+      const nt = Object.keys(st.treasures).filter((k) => st.treasures[k] > 0 && TRE[k]).length;
+      $('eCount').textContent = '엔딩 ' + st.endingsSeen.length + '/' + PG.ENDINGS.length + ' · 보물 ' + nt + '/' + PG.TREASURES.length +
+        ' · 일기 ' + st.unlockedFragments.length + '/' + PG.FRAGMENTS.length;
+    },
+    showTab(tab) {
+      this.tab = tab;
+      document.querySelectorAll('#bTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+      $('eCards').hidden = tab !== 'end'; $('bTreWrap').hidden = tab !== 'tre'; $('bDiary').hidden = tab !== 'diary';
+      $('bDesc').hidden = tab !== 'tre';
+      $('bDesc').textContent = '보물을 누르면 설명이 나와요.';
+      $('bBody').scrollTop = 0;
+    },
+    buildTre() {
+      const g = $('bTre'); g.innerHTML = '';
+      PG.TREASURES.forEach((t) => {
+        const n = st.treasures[t.id] || 0, el = document.createElement('button');
+        el.className = 'tcell' + (n ? '' : ' locked');
+        el.innerHTML = '<img src="' + S.treasureURL(t.id, !n) + '" alt="">' + (n ? t.name + '<br><span class="stars">' + '★'.repeat(t.rarity) + '</span>' : '?<br><small>' + t.pool + '</small>') +
+          (n > 1 ? '<span class="cnt">×' + n + '</span>' : '');
+        el.addEventListener('click', () => { $('bDesc').textContent = n ? t.name + ' — ' + t.desc : '아직 못 찾은 보물 · ' + t.pool + ' 쪽에서 나와요'; });
+        g.appendChild(el);
+      });
+    },
+    buildDiary() {
+      const box = $('bDiary'), grpOf = {};
+      PG.DIARY_GROUPS.forEach((gp) => gp.frags.forEach((f) => (grpOf[f] = gp)));
+      const etitle = (id) => (st.endingsSeen.includes(id) ? '「' + END[id].title + '」' : '「???」');
+      let h = '<div class="dgroups">' + PG.DIARY_GROUPS.map((gp) => {
+        const k = gp.frags.filter((f) => st.unlockedFragments.includes(f)).length;
+        return '<span class="chip mini' + (k === gp.frags.length ? ' ok' : '') + '" title="' + END[gp.ending].hint + '">' + etitle(gp.ending) + ' ' + k + '/' + gp.frags.length + '</span>';
+      }).join('') + '</div>';
+      h += PG.FRAGMENTS.map((f, i) => {
+        const un = st.unlockedFragments.includes(f.id), gp = grpOf[f.id];
+        const tag = '<span class="dtag">' + (i + 1) + '쪽 · ' + (gp ? etitle(gp.ending) + ' 의 조각' : '') + (!un && f.source === 'treasure' ? ' · 어딘가 묻혀 있다' : '') + '</span>';
+        return '<p class="dline' + (un ? '' : ' locked') + '">' + tag + (un ? f.text : '<span class="blk">' + f.text.replace(/[^\s]/g, '■') + '</span>') + '</p>';
+      }).join('');
+      box.innerHTML = h;
+    },
+    buildEndings() {
       const box = $('eCards'); box.innerHTML = '';
       PG.ENDINGS.forEach((e) => {
         const un = st.endingsSeen.includes(e.id);
         const pic = endingArt(e.id, !un);
         const el = document.createElement('div');
         el.className = 'ecard' + (un ? '' : ' locked');
-        el.innerHTML = '<img src="' + S.toURL(pic, 2) + '" alt=""><b>' + (un ? e.title : '???') + '</b><p>' + (un ? e.card : '잠김 · ' + e.hint) + '</p>';
+        el.innerHTML = '<img src="' + S.toURL(pic, 2) + '" alt=""><div class="etx"><b>' + (un ? e.title : '???') + '</b><p>' + (un ? e.card : '잠김 · ' + e.hint) + '</p></div>';
         if (un) {
           const b = document.createElement('button'); b.className = 'btn small'; b.textContent = '다시 보기';
           b.addEventListener('click', () => go('ending', { id: e.id, then: 'endings', replay: true }));
-          el.appendChild(b);
+          el.querySelector('.etx').appendChild(b);
         }
         box.appendChild(el);
       });
-      $('eCount').textContent = st.endingsSeen.length + '/' + PG.ENDINGS.length + ' · 일기 조각 ' + st.unlockedFragments.length + '/' + PG.FRAGMENTS.length;
     },
     update() {},
-    render(ctx) { drawRoom(ctx, LW, LH, 'sunny'); ctx.fillStyle = 'rgba(43,33,28,0.25)'; ctx.fillRect(0, 0, LW, LH); },
+    render(ctx) { stage(ctx, 'sunny'); ctx.fillStyle = 'rgba(43,33,28,0.25)'; ctx.fillRect(0, 0, LW, LH); },
   };
+  document.querySelectorAll('#bTabs .tab').forEach((b) => b.addEventListener('click', () => scenes.endings.showTab(b.dataset.tab)));
   $('bookBtn').addEventListener('click', () => go('endings', { back: sceneName }));
   $('eBack').addEventListener('click', () => go(scenes.endings.back || 'wardrobe'));
+
+  /* ---------- 8. 지도(목적지 고르기) ---------- */
+  const fmtDur = (sec) => (sec < 60 ? Math.round(sec) + '초' : sec < 3600 ? Math.round(sec / 60) + '분' : (sec / 3600).toFixed(1).replace('.0', '') + '시간');
+  const mmss = (ms) => { const t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), x = t % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(x).padStart(2, '0'); };
+  scenes.map = {
+    sel: 'piazza',
+    enter(arg) {
+      if (st.out) { go('home'); return; }
+      this.eve = !!arg.evening; this.t = 0; this.snack = false;
+      this.day = this.eve && st.lastWalk ? st.lastWalk.day : st.day;
+      this.build();
+    },
+    build() {
+      const day = this.day, eve = this.eve, wl = PG.WEATHER[dayInfo(day).weather].label;
+      $('mTitle').textContent = (eve ? '저녁 산책 · ' : '') + 'Day ' + day + ' · ' + wl + ' · 어디로 보낼까요?';
+      const box = $('mCards'); box.innerHTML = '';
+      PG.DESTS.forEach((D) => {
+        const di = destDI(D, day, eve), nb = destNeighbors(D, di), fit = destFit(D, di);
+        const b = document.createElement('button');
+        b.className = 'dcard' + (D.id === this.sel ? ' on' : ''); b.dataset.id = D.id;
+        b.innerHTML = '<div class="dhead"><b>' + D.name + '</b><span class="dtime">⏱ ' + fmtDur(outMs(D, eve) / 1000) + '</span></div>' +
+          '<div class="faces">' + (nb.length ? nb.map((id) => '<img src="' + S.faceURL(id) + '" alt="' + NB[id].name + '" title="' + NB[id].name + '">').join('') : '조용한 길') + '</div>' +
+          '<div class="dtrait">' + D.trait + '</div>' + (D.perk ? '<div class="dperk">' + D.perk + '</div>' : '') +
+          '<div>코디 적합 <span class="stars">' + starsHTML(fit.stars) + '</span></div>';
+        b.addEventListener('click', () => { this.sel = D.id; this.build(); });
+        box.appendChild(b);
+      });
+      const can = this.snack || st.coins >= PG.SNACK_COST;
+      $('mSnack').classList.toggle('on', this.snack); $('mSnack').disabled = !can;
+      $('mSnackSub').textContent = PG.SNACK_COST + '코인 · 파볼 기회 +1' + (can ? '' : ' (코인 부족)');
+      $('mGo').textContent = DEST[this.sel].name + '로 보내기';
+      $('mBack').hidden = eve;
+    },
+    async send() {
+      if (st.out) { go('home'); return; }
+      if (this.snack) { if (st.coins < PG.SNACK_COST) { toast('코인이 부족해요'); return; } st.coins -= PG.SNACK_COST; }
+      st.out = makeOut(this.sel, this.eve, this.snack);
+      await save();
+      go('home');
+    },
+    update(dt) { this.t += dt; },
+    render(ctx) { drawMap(ctx, LW, ROOM_H, this.sel, this.t); ctx.fillStyle = '#2b211c'; ctx.fillRect(0, ROOM_H, LW, LH - ROOM_H); },
+  };
+  $('mSnack').addEventListener('click', () => { scenes.map.snack = !scenes.map.snack; scenes.map.build(); });
+  $('mGo').addEventListener('click', () => scenes.map.send());
+  $('mBack').addEventListener('click', () => go('wardrobe'));
+
+  /* ---------- 9. 대기(빈 집) ---------- */
+  scenes.home = {
+    enter() {
+      if (!st.out) { go('wardrobe'); return; }
+      this.t = 0; this.key = '';
+      const o = st.out, D = DEST[o.dest];
+      $('hWho').textContent = josa(st.dog.name, '과/와') + ' ' + D.name + '에 나갔어요' + (o.evening ? ' · 저녁' : '');
+      $('hSub').textContent = '보물 · ' + D.pool + (o.snack ? ' · 간식 챙김(파볼 기회 2)' : '');
+    },
+    update(dt) {
+      this.t += dt;
+      const o = st.out; if (!o) return;
+      const left = Math.max(0, o.endAt - Date.now()), done = left <= 0;
+      const key = done ? 'done' : mmss(left);
+      if (key === this.key) return;
+      this.key = key;
+      $('hLeft').textContent = done ? '돌아왔어요!' : '남은 시간 ' + key;
+      $('hLeft').classList.toggle('done', done);
+      $('hGreet').hidden = !done; $('hAd').hidden = done;
+      if (done) $('hWho').textContent = josa(st.dog.name, '과/와') + ' 함께 ' + DEST[o.dest].name + '에서 돌아왔어요';
+    },
+    render(ctx) {
+      const o = st.out;
+      stage(ctx, o && o.evening ? 'dusk' : o ? o.weather : 'sunny');
+      // 비어 있는 줄걸이 · 강아지 방석
+      const hx = Math.floor(LW * 0.62), hy = ROOM_H - 20 - 62;
+      ctx.fillStyle = '#5e3e25'; ctx.fillRect(hx - 6, hy, 16, 3);
+      ctx.fillStyle = '#d9b45a'; ctx.fillRect(hx - 2, hy + 3, 1, 3); ctx.fillRect(hx - 2, hy + 6, 3, 1); ctx.fillRect(hx + 5, hy + 3, 1, 3); ctx.fillRect(hx + 5, hy + 6, 3, 1);
+      const cx0 = Math.floor(LW * 0.72), fy = ROOM_H - 20;
+      ctx.fillStyle = '#2b211c'; ctx.fillRect(cx0 - 1, fy + 2, 34, 8);
+      ctx.fillStyle = '#7a2232'; ctx.fillRect(cx0, fy + 3, 32, 6);
+      ctx.fillStyle = '#96364a'; ctx.fillRect(cx0 + 3, fy + 4, 26, 3);
+      if (o) {
+        const tot = Math.max(1, o.endAt - o.startAt), frac = clamp((Date.now() - o.startAt) / tot, 0, 1);
+        drawClock(ctx, Math.floor(LW * 0.68), 40, frac, Date.now() / 1000);
+      }
+    },
+  };
+  $('hShop').addEventListener('click', () => go('shop'));
+  $('hBook').addEventListener('click', () => go('endings', { back: 'home', tab: 'tre' }));
+  $('hDiary').addEventListener('click', () => go('endings', { back: 'home', tab: 'diary' }));
+  $('hGreet').addEventListener('click', () => go('replay'));
+  $('hAd').addEventListener('click', () => showAd(async () => {
+    if (!st.out) return;
+    st.out.endAt = Date.now(); await save(); toast(josa(st.dog.name, '이/가') + ' 서둘러 돌아오고 있어요');
+  }));
+
+  /* ---------- 10. 귀가 리플레이 ---------- */
+  const REPLAY_SPEED = 2.5;
+  scenes.replay = {
+    enter() {
+      if (!st.out) { go('wardrobe'); return; }
+      inp.down = false;
+      this.w = makeWalk({ out: st.out }); scenes.walk.w = this.w;
+      hidePrompt(); $('dlg').hidden = true;
+      $('rpInfo').textContent = '귀가 리플레이 · ' + DEST[st.out.dest].name + ' ▶▶';
+    },
+    exit() { hidePrompt(); $('dlg').hidden = true; inp.down = false; },
+    update(dt) {
+      const w = this.w;
+      if (!w || w.done) return;
+      if (w.mode === 'nbrPrompt' && w.waiting) {
+        w.waitT += dt * (DEBUG.timeScale || 1);
+        setBar('fill', clamp(100 - (w.waitT / 4) * 100, 0, 100));
+        if (inp.down && !inp.swiped && !inp.consumed && inp.t0 >= w.promptAt && performance.now() - inp.t0 >= 700) { inp.consumed = true; walkGesture(w, 'talk'); }
+        else if (w.waitT >= 4) replayAutoGreet(w);
+      }
+      let left = dt * REPLAY_SPEED * (DEBUG.timeScale || 1);
+      while (left > 0 && !w.done) { const s2 = Math.min(left, 1 / 30); stepWalk(w, s2); left -= s2; }
+      if (w.smile) w.smile = Math.max(0, w.smile - dt);
+    },
+    render(ctx) { if (this.w) renderWalk(ctx, this.w); },
+  };
+  $('rpSkip').addEventListener('click', () => {
+    const w = scenes.replay.w;
+    if (sceneName !== 'replay' || !w || w.done) return;
+    w.auto = true; hidePrompt(); $('dlg').hidden = true;
+    simulateWalk(w);
+    w.done = true; finishWalk(w);
+  });
+  DEBUG.skip = () => $('rpSkip').click();
+
+  /* ---------- 11. 보물 파기 ---------- */
+  const SPOTNAME = { bush: '수풀 아래', fountain: '분수대 옆', lamp: '가로등 밑' };
+  scenes.dig = {
+    enter() {
+      const lw = st.lastWalk;
+      if (!lw || !lw.dig) { go('result'); return; }
+      this.t = 0; this.anim = null; this.build();
+    },
+    build() {
+      const lw = st.lastWalk, dig = lw.dig, box = $('dSpots'); box.innerHTML = '';
+      const left = Math.max(0, Math.min(dig.picks, dig.spots.length) - dig.used);
+      $('dTitle').textContent = dig.spots.length ? josa(st.dog.name, '이/가') + ' 킁킁거린 자리 ' + dig.spots.length + '곳' : '오늘은 킁킁거린 자리가 없어요';
+      $('dSub').textContent = this.anim ? '파는 중…' : !dig.done ? '파 볼 곳을 골라요 · 남은 기회 ' + left + (lw.snack ? ' (간식 +1)' : '')
+        : dig.spots.some((s2) => s2.st === 'gone') ? '안 판 자리는 다음에…' : dig.spots.length ? '오늘의 보물을 다 찾았어요' : '다음엔 냄새 자리에서 줄을 놓아 줘요';
+      dig.spots.forEach((sp, i) => {
+        const b = document.createElement('button');
+        const digging = this.anim && this.anim.i === i;
+        b.className = 'spot ' + (digging ? 'digging' : sp.st);
+        if (digging) b.innerHTML = '<img class="px" src="' + S.iconURL('mound') + '" alt=""><span class="q">…</span><small>파는 중</small>';
+        else if (sp.st === 'dug') {
+          const t = TRE[sp.tid];
+          b.innerHTML = '<img class="px" src="' + S.treasureURL(t.id) + '" alt=""><b>' + t.name + '</b><span class="stars">' + '★'.repeat(t.rarity) + '</span><small>' +
+            (sp.dup ? '중복 → 코인 +' + sp.coins : '새 보물!') + '</small>';
+        } else if (sp.st === 'gone') b.innerHTML = '<span class="q">·</span><small>다음에…</small>';
+        else b.innerHTML = '<img class="px" src="' + S.iconURL('mound') + '" alt=""><span class="q">?</span><small>' + (SPOTNAME[sp.prop] || '어딘가') + '</small>';
+        b.disabled = sp.st !== 'hidden' || dig.done || !!this.anim;
+        b.addEventListener('click', () => this.pick(i));
+        box.appendChild(b);
+      });
+      const last = this.last && this.last.st === 'dug' ? this.last : null;
+      $('dDesc').innerHTML = last ? '<b>' + TRE[last.tid].name + '</b> — ' + TRE[last.tid].desc + (last.frag ? '<div class="diary" style="margin-top:6px">일기 · ' + FRAG[last.frag].text + '</div>' : '') : '';
+      $('dNext').hidden = !dig.done || !!this.anim;
+    },
+    pick(i) {
+      if (this.anim) return;
+      const sp = digSpot(i);
+      if (!sp) return;
+      save(); updateHUD();
+      this.anim = { t: 0, i }; this.last = sp; this.build();
+    },
+    update(dt) {
+      this.t += dt;
+      if (this.anim) {
+        this.anim.t += dt * (DEBUG.timeScale || 1);
+        if (this.anim.t >= 1) {
+          this.anim = null; this.build();
+          const sp = this.last, t = TRE[sp.tid];
+          toast(sp.frag ? '일기에 한 줄이 생겼다 · ' + t.name : sp.dup ? '이미 있는 보물 · 코인 +' + sp.coins : '새 보물 · ' + t.name, 2400);
+        }
+      }
+    },
+    render(ctx) {
+      const lw = st.lastWalk, dig = lw && lw.dig, type = dig ? dig.dest : 'piazza';
+      const H = BH, L = lay(H);
+      drawBase(bx, LW, H, 300, lw ? lw.weather : 'sunny', { sky: lw && lw.evening ? 'dusk' : null, t: this.t, seed: dig ? dig.seed : 1,
+        segs: [{ x0: -1e5, x1: 1e5, type }], avoid: [300 + Math.round(LW * 0.3), 300 + Math.round(LW * 0.65)] });
+      const gx = Math.round(LW * 0.3), dxp = Math.round(LW * 0.62);
+      const m = S.prop('mound');
+      if (dig && dig.spots.some((s2) => s2.st === 'hidden') || this.anim) bx.drawImage(m, dxp + 6, L.yF - m.height + 2);
+      const a = this.anim, fr = a ? (Math.floor(a.t * 8) % 2 ? 'dig1' : 'dig0') : Math.floor(this.t / 1.6) % 4 === 3 ? 'w2' : 'w0';
+      const d = drawDog(bx, H, st.dog.breed, dxp, fr, st.equipped.dog);
+      if (a) {
+        bx.fillStyle = '#7a5232';
+        for (let i = 0; i < 6; i++) { const ph = (a.t * 3 + i / 6) % 1; bx.fillRect(Math.round(dxp - 6 - ph * 18 - i), Math.round(L.yF - 4 - Math.sin(ph * Math.PI) * 14), 1, 1); }
+      }
+      const g = drawGent(bx, H, st.equipped, gx, Math.floor(this.t / 0.9) % 2 ? 5 : 4, { weather: lw ? lw.weather : 'sunny' });
+      drawLeash(bx, [g.hand[0] + 1, g.hand[1] + 1], d.neck);
+      const sky = SKY[lw && lw.evening ? 'dusk' : lw ? lw.weather : 'sunny'] || SKY.sunny;
+      blitBand(ctx, sky[0]);
+    },
+  };
+  $('dNext').addEventListener('click', () => go('result'));
+  DEBUG.dig = (i) => scenes.dig.pick(i || 0);
 
   /* ---------- 7. 엔딩 씬 ---------- */
   scenes.ending = {
@@ -1230,29 +1749,30 @@
 
   /* ---------------- 입력 ---------------- */
   // 산책: 누르고 있기=줄 당기기, 스와이프(24px↑)=위/아래 선택·인사, 짧은 탭=미소, 인사 구간 0.7초 홀드=대화
+  // 리플레이: 줄은 자동(AI). 입력은 인사(스와이프·길게)와 대화 탭만.
   window.addEventListener('pointerdown', (e) => {
-    if (sceneName !== 'walk') return;
+    if (!walky()) return;
     if (e.target.closest && e.target.closest('button')) return;
     const w = scenes.walk.w;
     if (!w || w.done) return;
     if (w.mode === 'heart') { heartTap(w); return; }   // 대화 중: 탭만 받고 홀드·스와이프 무시
     Object.assign(inp, { down: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), swiped: false, consumed: false });
-    setHeld(w, true);
+    if (sceneName === 'walk') setHeld(w, true);
   });
   window.addEventListener('pointermove', (e) => {
-    if (!inp.down || e.pointerId !== inp.id || sceneName !== 'walk') return;
+    if (!inp.down || e.pointerId !== inp.id || !walky()) return;
     const dx = e.clientX - inp.x0, dy = e.clientY - inp.y0;
     if (inp.swiped || inp.consumed || Math.hypot(dx, dy) < 24) return;
     inp.swiped = true;
-    setHeld(scenes.walk.w, false);
+    if (sceneName === 'walk') setHeld(scenes.walk.w, false);
     walkSwipe(dy < 0 ? 'up' : 'down');
   });
   const pointerEnd = (e) => {
     if (!inp.down || e.pointerId !== inp.id) return;
     inp.down = false;
-    if (sceneName !== 'walk') return;
+    if (!walky()) return;
     if (e.type === 'pointerup' && !inp.swiped && !inp.consumed && performance.now() - inp.t0 < 250) walkTap();
-    setHeld(scenes.walk.w, false);
+    if (sceneName === 'walk') setHeld(scenes.walk.w, false);
   };
   window.addEventListener('pointerup', pointerEnd);
   window.addEventListener('pointercancel', pointerEnd);
@@ -1264,7 +1784,7 @@
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (scene && !PORTRAIT.matches && !document.hidden) {
+    if (scene && !LANDSCAPE.matches && !document.hidden) {
       if (scene.update) scene.update(dt);
       lx.setTransform(1, 0, 0, 1, 0, 0);
       if (scene.render) scene.render(lx);
@@ -1295,13 +1815,21 @@
     if (h === 'dog') go('dog');
     else if (h === 'wardrobe') go('wardrobe');
     else if (h === 'walk') go('walk');
+    else if (h === 'map') go('map');
+    else if (h === 'home') { if (!st.out) { st.out = makeOut('piazza', false, false); await save(); } go('home'); }
+    else if (h === 'replay') { if (!st.out) { st.out = makeOut('piazza', false, false); st.out.endAt = Date.now(); await save(); } go('replay'); }
+    else if (h === 'dig') {
+      if (st.lastWalk && st.lastWalk.dig && !st.lastWalk.dig.done) go('dig'); else simulateOuting(false);
+    }
     else if (h === 'shop') go('shop');
     else if (h === 'endings') go('endings', { back: 'wardrobe' });
     else if (h.indexOf('ending-') === 0 && END[h.slice(7)]) go('ending', { id: h.slice(7), then: 'endings', replay: true });
     else if (h === 'result') {
-      if (!st.lastWalk) { go('walk'); const w = simulateWalk(); w.done = true; finishWalk(w); }
+      if (!st.lastWalk) simulateOuting(true);
       else go('result');
     } else if (!st) go('dog');
+    else if (st.out) go('home');
+    else if (st.lastWalk && st.lastWalk.dig && !st.lastWalk.dig.done) go('dig');
     else if (st.pendingEnding && st.lastWalk) go('result');
     else go('wardrobe');
   }

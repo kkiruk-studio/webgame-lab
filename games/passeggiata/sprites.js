@@ -336,10 +336,12 @@
     if (r) return r;
     const D = DOGS[breed];
     const c = mk(D.w, D.h + 2), x = c.getContext('2d');
-    const li = frame === 'sniff' ? 0 : +frame[1];
+    /* 'dig0'/'dig1': 파기(머리 숙이고 앞발 번갈아) */
+    const dig = frame === 'dig0' ? 1 : frame === 'dig1' ? 2 : 0;
+    const li = frame === 'sniff' ? 0 : dig ? (dig === 1 ? 1 : 3) : +frame[1];
     paint(x, D.legs[li], D.pal, D.legsX, D.legsY);
     paint(x, D.body.rows, D.pal, D.body.x, D.body.y);
-    if (frame === 'sniff') paint(x, D.head.rows, D.pal, D.head.x + D.sniff[0], D.head.y + D.sniff[1]);
+    if (frame === 'sniff' || dig) paint(x, D.head.rows, D.pal, D.head.x + D.sniff[0], D.head.y + D.sniff[1] - (dig === 2 ? 1 : 0));
     else if (frame[0] === 'k') paint(x, D.sulk.rows, D.pal, D.sulk.x, D.sulk.y);
     else paint(x, D.head.rows, D.pal, D.head.x, D.head.y);
     const it = itemId && ITEMS[itemId];
@@ -450,6 +452,20 @@
     pigeon0: { pal: { g: '#8a8f98', G: '#5f646c', p: '#9a7fa8', k: '#2b211c', o: '#d9a441' }, rows: ['.gk...', 'ogggg.', '.gpGGG', '..GGG.', '..o.o.'] },
     pigeon1: { pal: { g: '#8a8f98', G: '#5f646c', k: '#2b211c', o: '#d9a441' }, rows: ['G....G', 'GG..GG', '.GggG.', 'okggg.', '..g...'] },
     coinicon: { pal: { o: '#e0b23a', O: '#9c7020', w: '#fff3c4', k: '#5a3e14' }, rows: ['..ooo..', '.owwoO.', 'owoooOo', 'owokoOo', 'ooooOOo', '.oOOOO.', '..ooo..'] },
+    /* 동네 약도 아이콘 */
+    m_home: { pal: { r: '#b8592f', w: '#efe2c4', b: '#6c7f8c', g: '#4f6b4a' }, rows: ['....rrr....', '...rrrrr...', '..rrrrrrr..', '.rrrrrrrrr.',
+      'rrrrrrrrrrr', '.wwwwwwwww.', '.wbbwwggww.', '.wbbwwggww.', '.wwwwwggww.', '.wwwwwggww.'] },
+    m_piazza: { pal: { b: '#8fbbd6', w: '#e8f3f8', c: '#d4cab2', C: '#b4a98f' }, rows: ['.....b.....', '....bwb....', '...b.c.b...', '.....c.....',
+      '.ccccccccc.', 'cCbbbwbbbCc', 'cCCCCCCCCCc', '.cCCCCCCCc.', '..ccccccc..'] },
+    m_flowers: { pal: { T: '#b8592f', t: '#efe2c4', k: '#5a3a22', b: '#4f7fc0', B: '#2f5a99', g: '#5f7a36', p: '#9a6a3e', P: '#74502c' },
+      rows: ['TtTtTtTtTtT', 'TtTtTtTtTtT', '.k.......k.', '.k.b.B.b.k.', '.kbBbbbBbk.', '.k.g.g.g.k.', '.kpppppppk.', '.kPPPPPPPk.', '.k.......k.'] },
+    m_alley: { pal: { i: '#2f3333', y: '#f1d98a', Y: '#d9b85a' }, rows: ['.iii.', 'iyyyi', 'iyYyi', '.iii.', '..i..', '..i..', '..i..', '..i..',
+      '..i..', '..i..', '.iii.', 'iiiii'] },
+    m_park: { pal: { g: '#6f8a3e', G: '#566e2e', l: '#93ab5a', t: '#6b4a2f' }, rows: ['...ggggg...', '.ggglgggg..', 'gggglggggg.', 'ggGggggglgg',
+      'gggggGgggGg', '.gGgggggGg.', '..GGGGGGG..', '....tt.....', '....tt.....', '....tt.....', '...tttt....'] },
+    /* 파볼 자리 흙더미 */
+    mound: { pal: { l: '#9a6a3e', d: '#7a5232', D: '#5a3a22' }, rows: ['.....llll.....', '...lldddll....', '..lddddddDl...', '.ldddDdddddl..',
+      'ldddddddDdddl.', 'DDDDDDDDDDDDDD'] },
     book: { pal: { r: '#7a2232', R: '#5a1824', w: '#f6efdf', y: '#d9b45a' }, rows: ['rrrrrrrr.', 'rRyyyyRrw', 'rRyRRyRrw', 'rRRRRRRrw', 'rRRRRRRrw', 'rRRyyRRrw', 'rRRRRRRrw', 'rrrrrrrrw', '.wwwwwwww'] },
   };
   const PROPS = {};
@@ -603,6 +619,57 @@
     const c = mk(cr[2], cr[3]);
     c.getContext('2d').drawImage(g.c, -cr[0], -cr[1]);
     return toURL(c, 5);
+  };
+
+  /* ================= 보물 아이콘 (data.js PG.TREASURES 의 id) ================= */
+  const COINROWS = ['..ooo..', '.owwoo.', 'owoooOo', 'ooooOOo', 'oooOOOo', '.oOOOo.', '..ooo..'];
+  const TREASURE_DEF = {
+    t_coin: { pal: { o: '#e0b23a', O: '#b8862a', w: '#fff3c4' }, rows: COINROWS },
+    t_button: { pal: { b: '#7a5232', B: '#9a6a3e', k: '#3d2716' }, rows: ['..bbb..', '.bBBBb.', 'bBkBkBb', 'bBBBBBb', 'bBkBkBb', '.bBBBb.', '..bbb..'] },
+    t_thimble: { pal: { s: '#c9ccd1', S: '#9ea3aa' }, rows: ['..ss..', '.sSsS.', '.SsSs.', '.sSsS.', 'sSsSsS', 'ssssss', '.SSSS.'] },
+    t_key: { pal: { y: '#d9b45a' }, rows: ['.yyy.......', 'y...yyyyyyy', 'y...y...y.y', '.yyy.......'] },
+    t_saucer: { pal: { w: '#f6efdf', b: '#4f7fc0', W: '#cfc2a2' }, rows: ['..wwwwwww..', '.wbbbbbbbw.', 'wbwwwwwwwbw', '.wbbbbbbbw.', '..WWWWWWW..'] },
+    t_ribbon: { pal: { b: '#5f8fc4', B: '#2f5a99' }, rows: ['bb.....bb', 'bBb...bBb', 'bBBbBbBBb', 'bBb.b.bBb', 'bb.b.b.bb', '...b.b...'] },
+    t_marble: { pal: { b: '#5f8fc4', B: '#2f5a99', w: '#e8f0fa' }, rows: ['.bbbb.', 'bwwbbb', 'bwbbBb', 'bbbBBb', 'bbBBBb', '.bbbb.'] },
+    t_seed: { pal: { p: '#cfc2a2', P: '#efe6cf', b: '#4f7fc0', B: '#2f5a99', w: '#e8f0fa', g: '#5f7a36' },
+      rows: ['ppppppp', 'pPPPPPp', 'pPbBbPp', 'pPbwbPp', 'pPbBbPp', 'pPPgPPp', 'pPPgPPp', 'pPPPPPp', 'ppppppp'] },
+    t_brooch: { pal: { y: '#d9b45a', b: '#4f7fc0', B: '#2f5a99', w: '#e8f0fa' }, rows: ['..yyy..', '.ybbby.', 'ybBwbby', 'ybbbBby', 'ybBbbby', '.ybbby.', '..yyy..'] },
+    t_oldcoin: { pal: { o: '#a8a48a', O: '#7d7a62', w: '#d8d4b8' }, rows: COINROWS },
+    t_postcard: { pal: { p: '#e3d3b0', P: '#b9a36b', R: '#c8452f', k: '#9a8a72' },
+      rows: ['pppppppppp', 'pPPPPPpRRp', 'pPPPPPpRRp', 'pPPPPPpppp', 'pPPPPPpkkp', 'pPPPPPpkkp', 'pppppppppp'] },
+    t_hairpin: { pal: { r: '#5f8fc4', y: '#e8c24a', k: '#9ea3aa' }, rows: ['.r.r......', 'rryrr.....', '.rrrkkkkkk', '.r.r.kkkk.'] },
+    t_photo: { pal: { w: '#f6efdf', S: '#b8956a', s: '#7a5a3a' },
+      rows: ['wwwwwwww', 'wSSSSSSw', 'wSsssSSw', 'wSsSsSSw', 'wSSsSSsw', 'wSsssSsw', 'wSSSSSSw', 'wwwwwwww', 'wwwwwwww'] },
+    t_ticket: { pal: { t: '#e8c24a', k: '#94451f', r: '#c8452f', w: '#efe6cf' },
+      rows: ['...rrrrrrrr', '...rwwwwwwr', 'ttttttttwwr', 'tkkkkkktwwr', 'ttttttttrrr', 'tkk.kkkt...', 'tttttttt...'] },
+    t_pinecone: { pal: { b: '#8a5a36', B: '#5e3e25', g: '#5f7a36' }, rows: ['..gg..', '.bBbB.', 'bBbBbB', 'BbBbBb', 'bBbBbB', '.BbBb.', '.bBbB.', '..bB..'] },
+    t_feather: { pal: { w: '#f2efe6', W: '#cfc9bd', k: '#7d7a62' }, rows: ['.......ww.', '.....wwWw.', '...wwWww..', '.wwWww....', 'kWw.......'] },
+    t_clover: { pal: { g: '#6f8a3e', G: '#93ab5a' }, rows: ['.gg.gg.', 'gGggGGg', '.ggGgg.', 'gGggGGg', '.gg.gg.', '...g...', '..g....', '..g....'] },
+    t_pebble: { pal: { p: '#8a8f98', P: '#a8adb5', w: '#e4e2dc' }, rows: ['..pppp..', '.pwPPPp.', 'pPPPPPPp', 'pPPPPPpp', '.pppppp.'] },
+  };
+  const TCACHE = {};
+  /* 14×14 칸 가운데 정렬(아이콘마다 크기가 달라도 같은 배율로 보이게). sil = 실루엣 */
+  S.treasure = function (id, sil) {
+    const k = id + (sil ? 's' : '');
+    if (TCACHE[k]) return TCACHE[k];
+    const d = TREASURE_DEF[id], c = mk(14, 14);
+    if (d) {
+      let im = outline(bakeRows(d.rows, d.pal));
+      if (sil) im = silhouette(im, '#9a8a72');
+      c.getContext('2d').drawImage(im, (14 - im.width) >> 1, (14 - im.height) >> 1);
+    }
+    TCACHE[k] = c;
+    return c;
+  };
+  const TURL = {};
+  S.treasureURL = function (id, sil) { const k = id + (sil ? 's' : ''); return TURL[k] || (TURL[k] = toURL(S.treasure(id, sil), 4)); };
+  /* 이웃 얼굴(머리 부분 크롭) */
+  const FURL = {};
+  S.faceURL = function (id) {
+    if (FURL[id]) return FURL[id];
+    const src = NCACHE[id][0], h = NBR[id].head + 2, c = mk(src.width, h);
+    c.getContext('2d').drawImage(src, 0, 0);
+    return (FURL[id] = toURL(c, 3));
   };
 
   S.bake = function () {
