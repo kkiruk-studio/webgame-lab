@@ -230,7 +230,9 @@ button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 /* 가로 경고(세로가 정상) */
 #rotate{position:fixed;inset:0;z-index:50;background:#2b211c;color:#f4ead5;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:700;font-size:15px;text-align:center;touch-action:none}
 #rotate svg{width:96px;height:96px;shape-rendering:crispEdges;transform:rotate(-90deg)}
-@media (orientation:landscape){#rotate{display:flex}}
+@media (orientation:landscape) and (pointer:coarse){#rotate{display:flex}}
+/* 데스크톱(마우스): 가운데 폰 크기 세로 프레임 */
+@media (pointer:fine){body{left:50%;right:auto;transform:translateX(-50%);width:min(100vw,calc(100dvh * 9 / 19.5));max-width:480px;box-shadow:0 0 0 1px #000,0 0 40px rgba(0,0,0,.6)}}
 @media (prefers-reduced-motion:reduce){#eTap,#dlg small{animation:none}}
 </style>
 </head>

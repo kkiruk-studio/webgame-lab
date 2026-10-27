@@ -6,7 +6,7 @@
   const PG = window.PG, S = PG.SPR;
   const $ = (id) => document.getElementById(id);
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const LANDSCAPE = matchMedia('(orientation: landscape)');   // 세로가 정상, 가로면 루프 정지 + 회전 안내
+  const LANDSCAPE = matchMedia('(orientation: landscape) and (pointer: coarse)');   // 세로가 정상, 가로면 루프 정지 + 회전 안내
   const ITEM = {}, NB = {}, BREED = {}, END = {}, FRAG = {}, DEST = {}, TRE = {};
   PG.DESTS.forEach((d) => (DEST[d.id] = d));
   PG.TREASURES.forEach((t) => (TRE[t.id] = t));
@@ -28,7 +28,7 @@
   let LW = 195, LH = 420, SC = 1, OX = 0, OY = 0, BAND_Y = 40;
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+    const W = Math.round(document.body.clientWidth * dpr), H = Math.round(document.body.clientHeight * dpr);
     cv.width = W; cv.height = H;
     SC = Math.max(1, Math.floor(W / 195));
     LW = Math.ceil(W / SC); LH = Math.ceil(H / SC);
