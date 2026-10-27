@@ -471,13 +471,14 @@
     clearTimeout(toastTimer); $('toast').classList.remove('on');
     document.querySelectorAll('.ui').forEach((el) => (el.hidden = !el.dataset.scene.split(' ').includes(name)));
     const walky = name === 'walk' || name === 'replay';
-    $('hud').hidden = !['wardrobe', 'walk', 'replay', 'result', 'shop', 'endings', 'map', 'home', 'dig'].includes(name);
+    $('hud').hidden = !['wardrobe', 'walk', 'replay', 'result', 'shop', 'endings', 'map', 'house', 'dig'].includes(name);
+    $('hudFlw').hidden = !['house', 'map', 'wardrobe', 'shop'].includes(name);
     $('bookBtn').hidden = walky || name === 'endings';
     $('timewrap').hidden = !walky;
     $('moodChip').hidden = !walky;
     $('rpBar').hidden = name !== 'replay';
     $('walkHint').hidden = name !== 'walk';
-    $('gearBtn').hidden = !['wardrobe', 'map', 'home'].includes(name);
+    $('gearBtn').hidden = !['wardrobe', 'map', 'house'].includes(name);
     $('gearMenu').hidden = true;
     clearInterval(adTimer); $('adWrap').hidden = true; adDone = null;
     if (scene.enter) scene.enter(arg || {});
@@ -490,10 +491,11 @@
     const ww = scenes.walk && scenes.walk.w;
     const d = (sceneName === 'result' || sceneName === 'dig') && st.lastWalk ? st.lastWalk.day
       : (sceneName === 'walk' || sceneName === 'replay') && ww && (ww.evening || ww.replay) ? ww.di.day
-      : sceneName === 'home' && st.out ? st.out.day
+      : sceneName === 'house' && st.out ? st.out.day
       : sceneName === 'map' && scenes.map.eve ? scenes.map.day : st.day;
     $('hudDay').textContent = 'Day ' + d;
     $('hudCoins').textContent = st.coins;
+    $('hudFlowers').textContent = st.flowers || 0;
   }
 
   /* ---------- 1. 강아지 선택 ---------- */
@@ -543,14 +545,14 @@
     const name = ($('dogName').value || '').trim() || BREED[sel].defaultName;
     st = PG.newSave(sel, name);
     await save();
-    go('wardrobe');
+    go('house');
   });
 
   /* ---------- 2. 옷장 ---------- */
   const TABS = PG.ALL_SLOTS;
   scenes.wardrobe = {
     tab: 'hat',
-    enter() { if (st.out) { go('home'); return; } this.t = 0; this.di = dayInfo(st.day); this.build(); },
+    enter() { if (st.out) { go('house'); return; } this.t = 0; this.di = dayInfo(st.day); this.build(); },
     build() {
       const di = this.di, sc = outfitScore(st.equipped, di);
       $('wIcon').src = S.iconURL(di.weather === 'sunny' ? 'sun' : di.weather === 'cloudy' ? 'cloudi' : 'rain');
@@ -621,7 +623,8 @@
   }
   const ICONS = {};
   function iconFor(id) { const k = id + st.dog.breed; return ICONS[k] || (ICONS[k] = S.itemIconURL(id, st.dog.breed)); }
-  $('wShop').addEventListener('click', () => go('shop'));
+  $('wShop').addEventListener('click', () => go('shop', { back: 'wardrobe' }));
+  $('wClose').addEventListener('click', () => go('house'));
   $('wGo').addEventListener('click', () => go('map'));
   $('gearBtn').addEventListener('click', () => { $('gearMenu').hidden = !$('gearMenu').hidden; });
   $('tCoins').addEventListener('click', async () => { st.coins += 200; await save(); updateHUD(); toast('테스트: 코인 +200'); });
@@ -640,6 +643,12 @@
     st.out.endAt = Date.now(); await save(); toast('테스트: 타이머 즉시 완료');
   });
   $('tWalk').addEventListener('click', () => go('walk'));
+  $('tBloom').addEventListener('click', async () => {
+    $('gearMenu').hidden = true;
+    const now = Date.now(), g = PG.flowerMs();
+    st.beds.forEach((b) => { b.plantedAt = Math.min(b.plantedAt, now - g); });
+    await save(); toast('테스트: 꽃 전부 개화');
+  });
 
   /* ---------- 3. 산책 ---------- */
   const SPEED = 26, DUR = 72, LEN = SPEED * DUR;
@@ -668,9 +677,9 @@
     return { score, favs, weather: sc.weather, stars: clamp(1 + Math.floor((score + 1) / 2), 1, 5) };
   }
   function outMs(D, eve) { return Math.round(D.sec * PG.TIMER_SCALE * (eve ? 0.5 : 1) * 1000); }
-  function makeOut(destId, eve, snack) {
+  function makeOut(destId, eve, snack, gift) {
     const D = DEST[destId], day = eve && st.lastWalk ? st.lastWalk.day : st.day, now = Date.now();
-    return { dest: D.id, snack: !!snack, seed: outSeed(day, eve, D), startAt: now, endAt: now + outMs(D, eve),
+    return { dest: D.id, snack: !!snack, gift: !!gift, seed: outSeed(day, eve, D), startAt: now, endAt: now + outMs(D, eve),
       weather: dayInfo(day).weather, day, evening: !!eve };
   }
   function makeWalk(opts) {
@@ -698,7 +707,8 @@
     if (out) {
       /* 귀가 리플레이: 집앞(짧게) + 목적지 한 구간, 갈림길 없음 */
       const D = DEST[out.dest];
-      Object.assign(w, { replay: true, dest: D, out, digSpots: [], hearts: [], route: ['home', D.id], waiting: false, waitT: 0 });
+      Object.assign(w, { replay: true, dest: D, out, digSpots: [], hearts: [], route: ['home', D.id], waiting: false, waitT: 0,
+        gift: !!out.gift, giftTo: null, giftBlue: false });   // 꽃 선물: 첫 이웃 인사에 호감 +1
       w.segs = [{ x0: 0, x1: 240, type: 'home' }, { x0: 240, x1: len + 800, type: D.id }];
       w.nbrPool = destNeighbors(D, di);
       buildSeg(w, 0, 'home'); buildSeg(w, 1, D.id);
@@ -984,6 +994,8 @@
     else if (w.mood >= 85 && inZone) { gain += e.id === 'sofia' ? 2 : 1; dogFx = 'trick'; }
     const hersTie = e.id === 'marta' && inZone && st.equipped.tie === 'tie_hers';
     if (hersTie) { gain += 1; w.hersTie = true; }
+    const gift = !!(w.gift && !w.giftTo && inZone);
+    if (gift) { gain += 1; w.giftTo = e.id; if (e.id === 'marta') w.giftBlue = true; }
     w.mode = 'greet'; w.mt = 0; w.gest = g; w.greetDur = g === 'talk' ? 4.5 : 2;
     e.fav = fav; e.perfect = perfect;
     w.aff[e.id] += gain;
@@ -991,12 +1003,17 @@
     w.greets.push({ id: e.id, fav, gain, gesture: g, perfect });
     if (e.id === 'marta' && eqItems(st.equipped).some((i) => i.color === 'blue')) w.blue = true;
     if (e.id === w.di.featured && fav) w.featuredFav = true;
-    e.bubble = !inZone ? 'awk' : hersTie || gain >= 2 ? 'h2' : gain >= 1 ? 'h1' : 'dots'; e.bt = w.greetDur + 0.6;
+    e.bubble = !inZone ? 'awk' : gift || hersTie || gain >= 2 ? 'h2' : gain >= 1 ? 'h1' : 'dots'; e.bt = w.greetDur + 0.6;
     if (dogFx === 'bark') w.dogBubble = { k: 'bang', t: 1.6 };
     else if (dogFx === 'trick') { w.dogState = 'trick'; w.dogT = 1.2; }
     const hearts = gain ? ' ' + '♥'.repeat(gain) : '';
     const dogNote = (hersTie ? ' · 마르타가 넥타이를 한참 바라봤다' : '') + (dogFx === 'bark' ? ' · ' + josa(st.dog.name, '이/가') + ' 짖었다' : dogFx === 'trick' ? ' · ' + josa(st.dog.name, '이/가') + ' 재주를 부렸다' : '');
     if (!inZone) { toast(n.name + ' · 어색… 눈 맞춤 구간을 놓쳤다' + hearts + dogNote, 2400); return; }
+    if (gift) {
+      if (perfect) { st.gestKnown = st.gestKnown || {}; st.gestKnown[e.id] = true; }
+      toast(n.name + '에게 파란 꽃을 건넸다' + hearts + (perfect ? ' · 완벽한 인사!' : '') + dogNote, 3000);
+      return;
+    }
     if (perfect && !(st.gestKnown && st.gestKnown[e.id])) {
       st.gestKnown = st.gestKnown || {}; st.gestKnown[e.id] = true;
       toast('완벽한 인사! ' + josa(n.name, '은/는') + ' ' + josa(GEST[g], '을/를') + ' 좋아한다' + hearts + dogNote, 3000);
@@ -1212,6 +1229,7 @@
     Object.keys(w.aff).forEach((k) => (st.affinity[k] += w.aff[k]));
     st.dogFree += w.dogFreeGain;
     if (w.blue) st.blueGreetDays += 1;
+    if (w.giftBlue) st.blueGreetDays += 1;   // 마르타에게 파란 꽃을 건넨 날은 한 번 더
     eqItems(st.equipped).forEach((i) => { st.wornCount[i.id] = (st.wornCount[i.id] || 0) + 1; });
     if (w.hersTie && st.hersTieLast !== di.day) { st.hersTieDays += 1; st.hersTieLast = di.day; }
     st.dogMood = clamp(Math.round(w.mood), 0, 100);
@@ -1241,13 +1259,26 @@
       coins: { pick: w.earned, find: w.findCoins, bonus, total },
       aff: w.aff, greets: w.greets, dogFree: w.dogFreeGain, diary, newFrags: newFr,
       shot: w.shot.toDataURL('image/png'),
-      dest: w.replay ? w.dest.id : null, hearts: (w.hearts || []).slice(), snack: !!(w.out && w.out.snack), perk,
+      dest: w.replay ? w.dest.id : null, hearts: (w.hearts || []).slice(), snack: !!(w.out && w.out.snack), perk, flowerGift: w.giftTo || null,
       dig: w.replay ? { seed: w.out.seed, dest: w.dest.id, pool: w.dest.pool, weather: di.weather, picks: w.out.snack ? 2 : 1, used: 0,
         spots: w.digSpots.map((sp) => ({ prop: sp.prop, st: 'hidden' })), done: !w.digSpots.length, found: [], dupCoins: 0 } : null,
     };
+    deliverMail(st.lastWalk);
     if (w.replay) st.out = null;
     if (w.autoDig) autoDig();
     save().then(() => go(w.replay && !w.autoDig ? 'dig' : 'result'));
+  }
+
+  /* 귀가 우편: 한 컷 사진 1장(최근 30장 보관) + 호감 단계에 처음 닿은 이웃 편지 최대 1통 */
+  const MAX_PHOTOS = 30;
+  function deliverMail(lw) {
+    const now = Date.now();
+    st.mail = st.mail || []; st.lettersSent = st.lettersSent || [];
+    st.mail.push({ id: 'p' + now, kind: 'photo', at: now, day: lw.day, evening: !!lw.evening, weather: lw.weather, dest: lw.dest, shot: lw.shot, read: false });
+    const L = PG.LETTERS.filter((l) => !st.lettersSent.includes(l.id) && (st.affinity[l.who] || 0) >= l.level).sort((a, b) => a.level - b.level)[0];
+    if (L) { st.lettersSent.push(L.id); st.mail.push({ id: 'l' + now, kind: 'letter', at: now + 1, day: lw.day, letter: L.id, read: false }); }
+    let extra = st.mail.filter((m) => m.kind === 'photo').length - MAX_PHOTOS;
+    if (extra > 0) st.mail = st.mail.filter((m) => !(m.kind === 'photo' && extra-- > 0));
   }
 
   /* ---------- 보물 파기 계산 ---------- */
@@ -1310,7 +1341,7 @@
   scenes.result = {
     enter() {
       const lw = st.lastWalk;
-      if (!lw) { go('wardrobe'); return; }
+      if (!lw) { go('house'); return; }
       $('rTitle').textContent = 'Day ' + lw.day + (lw.evening ? ' 저녁 산책 · ' : ' 귀가 · ') + PG.WEATHER[lw.weather].label +
         (lw.dest && DEST[lw.dest] ? ' · ' + DEST[lw.dest].name : '');
       $('rEve').hidden = !!lw.evening || st.eveningDay === lw.day || !!st.pendingEnding;
@@ -1346,6 +1377,7 @@
       }
       const talks = (lw.hearts || []).map((id) => PG.HEART_EVENTS.find((h) => h.id === id)).filter(Boolean)
         .map((h) => '<div>' + NB[h.who].name + ' · “' + fillDog(h.lines[h.lines.length - 1]) + '”</div>');
+      if (lw.flowerGift && NB[lw.flowerGift]) talks.unshift('<div>🌼 ' + NB[lw.flowerGift].name + '에게 파란 꽃을 건넸다</div>');
       const nf = (lw.newFrags || []).length;
       $('rTalkBox').hidden = !talks.length && !nf;
       $('rTalk').innerHTML = talks.join('') + (nf ? '<div class="plus">일기장에 ' + nf + '줄이 채워졌다</div>' : '');
@@ -1359,7 +1391,7 @@
       $('rShot').removeAttribute('src');
       cardCanvas = null;
       makeCard(lw.shot, lw).then((c) => { cardCanvas = c; $('rShot').src = c.toDataURL('image/png'); });
-      $('rNext').textContent = st.pendingEnding ? '…그날 저녁' : '내일 산책';
+      $('rNext').textContent = st.pendingEnding ? '…그날 저녁' : '집으로';
     },
     exit() { clearInterval(adTimer); $('adWrap').hidden = true; },
     update() {},
@@ -1391,15 +1423,19 @@
     else go(dest);
   }
   $('rShop').addEventListener('click', () => proceed('shop'));
-  $('rNext').addEventListener('click', () => proceed('wardrobe'));
+  $('rNext').addEventListener('click', () => proceed('house'));
   $('rShare').addEventListener('click', () => {
     if (!cardCanvas) return;
-    const lw = st.lastWalk, fname = 'passeggiata-day' + lw.day + '.png';
-    cardCanvas.toBlob(async (blob) => {
+    const lw = st.lastWalk;
+    shareCard(cardCanvas, 'passeggiata-day' + lw.day + '.png', 'Day ' + lw.day + ' · 오늘의 한 컷');
+  });
+  /* 한 컷 카드 공유(결산·사진첩 공용): 공유 시트 → 안 되면 파일 저장 */
+  function shareCard(canvas, fname, text) {
+    canvas.toBlob(async (blob) => {
       try {
         const file = new File([blob], fname, { type: 'image/png' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Passeggiata', text: 'Day ' + lw.day + ' · 오늘의 한 컷' });
+          await navigator.share({ files: [file], title: 'Passeggiata', text });
           return;
         }
       } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -1409,11 +1445,11 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       toast('이미지를 저장했어요');
     }, 'image/png');
-  });
+  }
 
   /* ---------- 5. 상점 ---------- */
   scenes.shop = {
-    enter() { $('sNote').textContent = st.out ? '산책 중 · 사면 옷장에 넣어둬요' : '사면 바로 입어요'; this.build(); },
+    enter(arg) { this.back = arg.back === 'wardrobe' ? 'wardrobe' : 'house'; $('sNote').textContent = st.out ? '산책 중 · 사면 옷장에 넣어둬요' : '사면 바로 입어요'; this.build(); },
     build() {
       const grid = $('sGrid'); grid.innerHTML = '';
       PG.ITEMS.filter((i) => !i.starter && !i.gift).forEach((it) => {
@@ -1442,23 +1478,45 @@
     update() {},
     render(ctx) { stage(ctx, 'sunny'); ctx.fillStyle = 'rgba(43,33,28,0.25)'; ctx.fillRect(0, 0, LW, LH); },
   };
-  $('sBack').addEventListener('click', () => go(st.out ? 'home' : 'wardrobe'));
+  $('sBack').addEventListener('click', () => go(st.out ? 'house' : scenes.shop.back || 'house'));
 
   /* ---------- 6. 엔딩 도감 ---------- */
   scenes.endings = {
     enter(arg) {
-      this.back = arg.back && arg.back !== 'endings' && arg.back !== 'ending' ? arg.back : (this.back || 'wardrobe');
-      if (['walk', 'dog', 'replay', 'dig'].includes(this.back)) this.back = 'wardrobe';
+      this.back = arg.back && arg.back !== 'endings' && arg.back !== 'ending' ? arg.back : (this.back || 'house');
+      if (['walk', 'dog', 'replay', 'dig'].includes(this.back)) this.back = 'house';
       this.tab = arg.tab || this.tab || 'end';
-      this.buildEndings(); this.buildTre(); this.buildDiary(); this.showTab(this.tab);
+      this.buildEndings(); this.buildTre(); this.buildDiary(); this.buildAlbum(); this.showTab(this.tab);
       const nt = Object.keys(st.treasures).filter((k) => st.treasures[k] > 0 && TRE[k]).length;
       $('eCount').textContent = '엔딩 ' + st.endingsSeen.length + '/' + PG.ENDINGS.length + ' · 보물 ' + nt + '/' + PG.TREASURES.length +
-        ' · 일기 ' + st.unlockedFragments.length + '/' + PG.FRAGMENTS.length;
+        ' · 일기 ' + st.unlockedFragments.length + '/' + PG.FRAGMENTS.length + ' · 사진 ' + this.photos().length;
+      const ph = arg.photo && this.photos().find((m) => m.id === arg.photo);
+      if (ph) this.showPhoto(ph);
+    },
+    photos() { return (st.mail || []).filter((m) => m.kind === 'photo').sort((a, b) => b.at - a.at); },
+    /* 사진첩: 우편으로 받은 한 컷 3열 그리드 → 크게 보기 + 공유 */
+    buildAlbum() {
+      const box = $('bAlbum'), ph = this.photos();
+      box.innerHTML = ph.length ? '' : '<div class="empty">산책에서 돌아오면 우편함으로 한 컷 사진이 와요.</div>';
+      ph.forEach((m) => {
+        const b = document.createElement('button');
+        b.innerHTML = '<img src="' + m.shot + '" alt="Day ' + m.day + '">';
+        b.addEventListener('click', () => this.showPhoto(m));
+        box.appendChild(b);
+      });
+    },
+    showPhoto(m) {
+      this.photo = m; this.card = null;
+      $('bPhotoImg').src = m.shot;
+      $('bPhotoCap').textContent = 'Day ' + m.day + (m.evening ? ' · 저녁' : '') + (m.dest && DEST[m.dest] ? ' · ' + DEST[m.dest].name : '') + (PG.WEATHER[m.weather] ? ' · ' + PG.WEATHER[m.weather].label : '');
+      $('bPhoto').hidden = false;
+      makeCard(m.shot, m).then((c) => { if (this.photo !== m) return; this.card = c; $('bPhotoImg').src = c.toDataURL('image/png'); });
     },
     showTab(tab) {
       this.tab = tab;
       document.querySelectorAll('#bTabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
       $('eCards').hidden = tab !== 'end'; $('bTreWrap').hidden = tab !== 'tre'; $('bDiary').hidden = tab !== 'diary';
+      $('bAlbum').hidden = tab !== 'album'; $('bPhoto').hidden = true; this.photo = null;
       $('bDesc').hidden = tab !== 'tre';
       $('bDesc').textContent = '보물을 누르면 설명이 나와요.';
       $('bBody').scrollTop = 0;
@@ -1510,7 +1568,13 @@
   };
   document.querySelectorAll('#bTabs .tab').forEach((b) => b.addEventListener('click', () => scenes.endings.showTab(b.dataset.tab)));
   $('bookBtn').addEventListener('click', () => go('endings', { back: sceneName }));
-  $('eBack').addEventListener('click', () => go(scenes.endings.back || 'wardrobe'));
+  $('eBack').addEventListener('click', () => go(scenes.endings.back || 'house'));
+  $('bPhotoClose').addEventListener('click', () => { $('bPhoto').hidden = true; scenes.endings.photo = null; });
+  $('bPhotoShare').addEventListener('click', () => {
+    const e = scenes.endings, m = e.photo;
+    if (!m || !e.card) return;
+    shareCard(e.card, 'passeggiata-day' + m.day + '.png', 'Day ' + m.day + ' · 오늘의 한 컷');
+  });
 
   /* ---------- 8. 지도(목적지 고르기) ---------- */
   const fmtDur = (sec) => (sec < 60 ? Math.round(sec) + '초' : sec < 3600 ? Math.round(sec / 60) + '분' : (sec / 3600).toFixed(1).replace('.0', '') + '시간');
@@ -1519,8 +1583,8 @@
   scenes.map = {
     sel: 'piazza',
     enter(arg) {
-      if (st.out) { go('home'); return; }
-      this.eve = !!arg.evening; this.t = 0; this.snack = false;
+      if (st.out) { go('house'); return; }
+      this.eve = !!arg.evening; this.t = 0; this.snack = false; this.gift = false;
       this.day = this.eve && st.lastWalk ? st.lastWalk.day : st.day;
       this.build();
     },
@@ -1528,6 +1592,8 @@
       const day = this.day, eve = this.eve, wl = PG.WEATHER[dayInfo(day).weather].label;
       $('mTitle').textContent = (eve ? '저녁 산책 · ' : '') + 'Day ' + day + ' · ' + wl + ' · 어디로 보낼까요?';
       const box = $('mCards'); box.innerHTML = '';
+      const nbSel = destNeighbors(DEST[this.sel], destDI(DEST[this.sel], day, eve)), fl = st.flowers || 0;
+      if (!nbSel.length) this.gift = false;
       PG.DESTS.forEach((D) => {
         const di = destDI(D, day, eve), nb = destNeighbors(D, di), fit = destFit(D, di);
         const b = document.createElement('button');
@@ -1535,82 +1601,360 @@
         b.innerHTML = '<div class="dhead"><b>' + D.name + '</b><span class="dtime">⏱ ' + fmtDur(outMs(D, eve) / 1000) + '</span></div>' +
           '<div class="faces">' + (nb.length ? nb.map((id) => '<img src="' + S.faceURL(id) + '" alt="' + NB[id].name + '" title="' + NB[id].name + '">').join('') : '조용한 길') + '</div>' +
           '<div class="dtrait">' + D.trait + '</div>' + (D.perk ? '<div class="dperk">' + D.perk + '</div>' : '') +
-          '<div>코디 적합 <span class="stars">' + starsHTML(fit.stars) + '</span></div>';
+          '<div>코디 적합 <span class="stars">' + starsHTML(fit.stars) + '</span></div>' +
+          (D.id === this.sel && this.gift ? '<div class="dperk">🌼 꽃 선물 챙김</div>' : '');
         b.addEventListener('click', () => { this.sel = D.id; this.build(); });
         box.appendChild(b);
       });
-      const can = this.snack || st.coins >= PG.SNACK_COST;
+      const giftCan = this.gift || (fl >= PG.GIFT_FLOWERS && nbSel.length > 0);
+      $('mGift').classList.toggle('on', this.gift); $('mGift').disabled = !giftCan;
+      $('mGiftSub').textContent = !nbSel.length ? '이 길에선 만날 이웃이 없어요' : !giftCan ? '파란 꽃이 모자라요 (보유 ' + fl + ')' : '첫 이웃 인사 호감 +1 · 보유 ' + fl;
+      /* 간식: 꽃 2 또는 코인 5(꽃 우선, 선물로 쓸 꽃은 빼고 셈) */
+      const byFlower = fl - (this.gift ? PG.GIFT_FLOWERS : 0) >= PG.SNACK_FLOWERS;
+      const can = this.snack || byFlower || st.coins >= PG.SNACK_COST;
       $('mSnack').classList.toggle('on', this.snack); $('mSnack').disabled = !can;
-      $('mSnackSub').textContent = PG.SNACK_COST + '코인 · 파볼 기회 +1' + (can ? '' : ' (코인 부족)');
+      $('mSnackSub').textContent = (byFlower ? '꽃 ' + PG.SNACK_FLOWERS : PG.SNACK_COST + '코인') + ' · 파볼 기회 +1' + (can ? '' : ' (코인 부족)');
       $('mGo').textContent = josa(DEST[this.sel].name, '으로/로') + ' 보내기';
       $('mBack').hidden = eve;
     },
     async send() {
-      if (st.out) { go('home'); return; }
-      if (this.snack) { if (st.coins < PG.SNACK_COST) { toast('코인이 부족해요'); return; } st.coins -= PG.SNACK_COST; }
-      st.out = makeOut(this.sel, this.eve, this.snack);
+      if (st.out) { go('house'); return; }
+      const fl = st.flowers || 0;
+      let payF = this.gift ? PG.GIFT_FLOWERS : 0, payC = 0;
+      if (payF > fl) { toast('파란 꽃이 모자라요'); return; }
+      if (this.snack) { if (fl - payF >= PG.SNACK_FLOWERS) payF += PG.SNACK_FLOWERS; else payC = PG.SNACK_COST; }
+      if (st.coins < payC) { toast('코인이 부족해요'); return; }
+      st.flowers = fl - payF; st.coins -= payC;
+      st.out = makeOut(this.sel, this.eve, this.snack, this.gift);
       await save();
-      go('home');
+      go('house', { leave: true });
     },
     update(dt) { this.t += dt; },
     render(ctx) { drawMap(ctx, LW, ROOM_H, this.sel, this.t); ctx.fillStyle = '#2b211c'; ctx.fillRect(0, ROOM_H, LW, LH - ROOM_H); },
   };
   $('mSnack').addEventListener('click', () => { scenes.map.snack = !scenes.map.snack; scenes.map.build(); });
+  $('mGift').addEventListener('click', () => { scenes.map.gift = !scenes.map.gift; scenes.map.build(); });
   $('mGo').addEventListener('click', () => scenes.map.send());
-  $('mBack').addEventListener('click', () => go('wardrobe'));
+  $('mBack').addEventListener('click', () => go('house'));
 
-  /* ---------- 9. 대기(빈 집) ---------- */
-  scenes.home = {
-    enter() {
-      if (!st.out) { go('wardrobe'); return; }
-      this.t = 0; this.key = '';
-      const o = st.out, D = DEST[o.dest];
-      $('hWho').textContent = josa(st.dog.name, '과/와') + ' ' + D.name + '에 나갔어요' + (o.evening ? ' · 저녁' : '');
-      $('hSub').textContent = '보물 · ' + D.pool + (o.snack ? ' · 간식 챙김(파볼 기회 2)' : '');
+  /* ---------- 9. 집: 실내 ↔ 마당 (옷장·결산 뒤 기본 화면, 외출 대기 겸용) ---------- */
+  const SLIDE_SEC = 0.25, GATE_SEC = 1.5;
+  const flowerStage = (b, now) => { const g = (now - b.plantedAt) / PG.flowerMs(); return g >= 1 ? 2 : g >= 0.5 ? 1 : 0; };
+  const unreadMail = () => (st.mail || []).filter((m) => !m.read).length;
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  function houseWeather() { const o = st.out; return o ? (o.evening ? 'dusk' : o.weather) : dayInfo(st.day).weather; }
+  /* 마당 배치: 화단 6칸(왼쪽~가운데) · 벤치 · 우편함 · 대문(오른쪽) */
+  const YL = (W) => { const gate0 = W - 36; return { bed0: 24, cw: 15, bedY: 141, benchX: 24 + 15 * 6 + 3, mbX: gate0 - 15, gate0, wallY: 112 }; };
+  /* 실내 배치: 창가 의자 · 강아지 깔개 · 줄걸이 */
+  const RL = (W) => ({ sx: Math.floor(W * 0.6), mat: Math.floor(W * 0.75), dogX: Math.floor(W * 0.75) + 16, hx: Math.floor(W * 0.86), hy: ROOM_H - 20 - 62 });
+  function drawGentFlip(ctx, H, eq, sx, frame, o) {
+    ctx.save(); ctx.translate(sx * 2, 0); ctx.scale(-1, 1);
+    const g = drawGent(ctx, H, eq, sx, frame, o);
+    ctx.restore();
+    return { hand: [sx * 2 - g.hand[0] - 1, g.hand[1]] };
+  }
+  scenes.house = {
+    view: 'room', pos: 0,
+    enter(arg) {
+      this.t = 0; this.key = ''; this.statKey = ''; this.fx = []; this.anim = null; this.dogWake = 0;
+      if (arg.leave && st.out) { this.view = 'yard'; this.anim = { kind: 'leave', t: 0 }; }
+      this.pos = this.view === 'yard' ? 1 : 0;
+      this.closeMail(); this.build();
+    },
+    exit() { this.anim = null; $('housePanel').classList.remove('busy'); },
+    build() {
+      const o = st.out, day = o ? o.day : st.day;
+      const wl = o && o.evening ? '저녁' : PG.WEATHER[o ? o.weather : dayInfo(day).weather].label;
+      $('hoTitle').textContent = 'Day ' + day + ' · ' + wl + ' · 우리 집';
+      $('hoSub').textContent = o ? '집이 조용해요. 빈 의자엔 신문만 놓여 있어요.'
+        : '신사는 창가에서 신문을 읽고, ' + josa(st.dog.name, '은/는') + ' 깔개에서 졸고 있어요.';
+      $('hoSend').hidden = !!o; $('hoOut').hidden = !o;
+      $('housePanel').classList.toggle('busy', !!this.anim);
+      this.key = ''; this.statKey = '';
+      this.dots();
+    },
+    dots() {
+      document.querySelectorAll('#hoDots button').forEach((b) => {
+        const on = b.dataset.v === this.view;
+        b.firstChild.textContent = on ? '●' : '○'; b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      $('hoDotBadge').hidden = !unreadMail();
+    },
+    stat() {
+      const c = Math.ceil(clamp(st.dogMood || 0, 0, 100) / 25 - 1e-9), un = unreadMail();
+      const k = c + '|' + st.flowers + '|' + un + '|' + this.view + '|' + !!st.out;
+      if (k === this.statKey) return;
+      this.statKey = k;
+      const tip = this.view === 'yard' ? '핀 꽃을 눌러 따요 · 우편함을 눌러 열어요 · 오른쪽으로 밀면 집 안'
+        : (st.out ? '' : josa(st.dog.name, '을/를') + ' 눌러 쓰다듬어요 · ') + '왼쪽으로 밀면 마당';
+      $('hoStat').innerHTML = '🐾 기분 ' + '■'.repeat(c) + '□'.repeat(4 - c) + ' · 🌼 파란 꽃 ' + (st.flowers || 0) + '송이' +
+        (un ? ' · <b>✉ 새 우편 ' + un + '</b>' : '') + '<div class="hint">' + tip + '</div>';
+      $('hoDotBadge').hidden = !un;
+    },
+    setView(v) {
+      if (this.anim || v === this.view || (v !== 'room' && v !== 'yard')) return;
+      this.view = v; this.dots(); this.statKey = '';
     },
     update(dt) {
       this.t += dt;
-      const o = st.out; if (!o) return;
+      const target = this.view === 'yard' ? 1 : 0;
+      if (REDUCED) this.pos = target;
+      else if (this.pos !== target) { const k = dt / SLIDE_SEC; this.pos = this.pos < target ? Math.min(target, this.pos + k) : Math.max(target, this.pos - k); }
+      if (this.dogWake > 0) this.dogWake -= dt;
+      this.fx.forEach((f) => (f.t += dt));
+      this.fx = this.fx.filter((f) => f.t < f.life);
+      const a = this.anim;
+      if (a) {
+        a.t += dt * (DEBUG.timeScale || 1);
+        if (a.t >= GATE_SEC) {
+          this.anim = null; $('housePanel').classList.remove('busy');
+          if (a.kind === 'enter') { go('replay'); return; }
+          if (st.out) toast(josa(st.dog.name, '과/와') + ' ' + josa(DEST[st.out.dest].name, '으로/로') + ' 산책을 나갔어요', 2000);
+        }
+      }
+      this.stat();
+      const o = st.out;
+      if (!o) return;
       const left = Math.max(0, o.endAt - Date.now()), done = left <= 0;
       const key = done ? 'done' : mmss(left);
       if (key === this.key) return;
       this.key = key;
-      $('hLeft').textContent = done ? '돌아왔어요!' : '남은 시간 ' + key;
-      $('hLeft').classList.toggle('done', done);
-      $('hGreet').hidden = !done; $('hAd').hidden = done;
-      if (done) $('hWho').textContent = josa(st.dog.name, '과/와') + ' 함께 ' + DEST[o.dest].name + '에서 돌아왔어요';
+      $('hoTimer').textContent = josa(st.dog.name, '과/와') + ' ' + DEST[o.dest].name + (o.evening ? '(저녁)' : '') + ' · ' + (done ? '돌아왔어요!' : key);
+      $('hoTimer').classList.toggle('done', done);
+      $('hoGreet').hidden = !done; $('hoAd').hidden = done;
     },
+    /* 맞이하기: 마당으로 돌아서 대문으로 걸어 들어오는 1.5초 → 리플레이 */
+    greet() {
+      if (!st.out || st.out.endAt > Date.now() || this.anim) return;
+      this.view = 'yard'; this.dots(); this.statKey = '';
+      this.anim = { kind: 'enter', t: 0 }; $('housePanel').classList.add('busy');
+    },
+    tap(x, y) {
+      if (this.anim || this.mailOpen || (this.pos !== 0 && this.pos !== 1) || y < 0 || y > ROOM_H) return;
+      if (this.view === 'room') {
+        const R = RL(LW);
+        if (!st.out && x >= R.mat - 6 && x <= R.mat + 38 && y >= 140) this.pet();
+        return;
+      }
+      const Y = YL(LW);
+      if (x >= Y.mbX - 3 && x <= Y.mbX + 16 && y >= 118 && y <= 152) { this.openMail(); return; }
+      const i = Math.floor((x - Y.bed0) / Y.cw);
+      if (i >= 0 && i < PG.BEDS && y >= 118 && y <= 152) this.pick(i);
+    },
+    /* 쓰다듬기: 기분 +5, 1분에 3번까지 */
+    pet() {
+      const now = Date.now(), R = RL(LW);
+      st.petLog = (st.petLog || []).filter((t) => now - t < 60000);
+      this.dogWake = 1.8;
+      const ok = st.petLog.length < 3;
+      for (let k = 0; k < (ok ? 3 : 1); k++) this.fx.push({ kind: 'heart', x: R.dogX - 9 + k * 7, y: 152 - (k % 2) * 3, t: -k * 0.15, life: 1.3 });
+      if (!ok) { toast(fillDog('{dog}가 졸린 눈을 껌뻑인다 · 쓰다듬기는 1분에 3번까지'), 1800); return; }
+      st.petLog.push(now); st.dogMood = clamp((st.dogMood || 0) + 5, 0, 100);
+      save(); toast(fillDog('{dog}가 꼬리를 흔든다') + ' · 기분 +5', 1800);
+    },
+    /* 화단: 핀 칸을 따면 꽃 +1, 그 자리에 바로 다시 심음 */
+    pick(i) {
+      const b = st.beds[i], now = Date.now(), stg = flowerStage(b, now), Y = YL(LW);
+      if (stg < 2) { toast((stg ? '봉오리' : '새싹') + ' · ' + mmss(b.plantedAt + PG.flowerMs() - now) + ' 뒤에 피어요', 1500); return; }
+      st.flowers = (st.flowers || 0) + 1; b.plantedAt = now;
+      this.fx.push({ kind: 'spark', x: Y.bed0 + i * Y.cw + 7, y: 126, t: 0, life: 0.6 });
+      save(); updateHUD(); this.statKey = '';
+      toast('파란 꽃 한 송이 · 보유 ' + st.flowers + '송이 (그 자리에 다시 심었어요)', 1600);
+    },
+    openMail() {
+      const items = (st.mail || []).slice().sort((a, b) => b.at - a.at);
+      const nL = items.filter((m) => m.kind === 'letter').length;
+      $('mlCount').textContent = items.length ? '편지 ' + nL + ' · 사진 ' + (items.length - nL) : '';
+      const NEW = ' <span class="badge">새</span>';
+      $('mlList').innerHTML = items.length ? items.map((m) => {
+        if (m.kind === 'photo') {
+          return '<button class="mitem" data-id="' + m.id + '"><img src="' + m.shot + '" alt=""><div><b>오늘의 한 컷</b>' + (m.read ? '' : NEW) +
+            '<br><small>Day ' + m.day + (m.evening ? ' 저녁' : '') + (m.dest && DEST[m.dest] ? ' · ' + DEST[m.dest].name : '') +
+            (PG.WEATHER[m.weather] ? ' · ' + PG.WEATHER[m.weather].label : '') + ' · 누르면 사진첩</small></div></button>';
+        }
+        const L = PG.LETTERS.find((l) => l.id === m.letter);
+        if (!L) return '';
+        return '<details class="mletter"><summary>✉ ' + NB[L.who].name + '의 편지 <small style="color:var(--muted)">· Day ' + m.day + '</small>' + (m.read ? '' : NEW) +
+          '</summary><p>' + L.lines.map((l) => esc(fillDog(l))).join('<br>') + '</p></details>';
+      }).join('') : '<div class="talk" style="color:var(--muted)">아직 우편이 없어요. 산책에서 돌아오면 사진과 편지가 와요.</div>';
+      $('mlList').querySelectorAll('.mitem').forEach((b) => b.addEventListener('click', () => go('endings', { back: 'house', tab: 'album', photo: b.dataset.id })));
+      items.forEach((m) => (m.read = true));
+      save();
+      $('housePanel').hidden = true; $('mailPanel').hidden = false; this.mailOpen = true;
+      this.statKey = ''; this.dots();
+    },
+    closeMail() { $('mailPanel').hidden = true; $('housePanel').hidden = false; this.mailOpen = false; },
     render(ctx) {
-      const o = st.out;
-      stage(ctx, o && o.evening ? 'dusk' : o ? o.weather : 'sunny');
-      // 비어 있는 줄걸이 · 강아지 방석
-      const hx = Math.floor(LW * 0.62), hy = ROOM_H - 20 - 62;
+      const off = Math.round(this.pos * LW);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, LW, ROOM_H); ctx.clip();
+      if (off < LW) { ctx.save(); ctx.translate(-off, 0); this.drawIn(ctx, LW); ctx.restore(); }
+      if (off > 0) { ctx.save(); ctx.translate(LW - off, 0); this.drawYard(ctx, LW); ctx.restore(); }
+      ctx.restore();
+      ctx.fillStyle = '#2b211c'; ctx.fillRect(0, ROOM_H, LW, LH - ROOM_H);
+    },
+    /* 실내: 집에 있으면 신사는 창가 의자에서 신문, 강아지는 깔개에서 잠. 외출 중엔 빈 의자에 신문만 */
+    drawIn(ctx, W) {
+      const o = st.out, H = ROOM_H, fy = H - 20, R = RL(W), t = this.t, now = Date.now();
+      drawRoom(ctx, W, H, houseWeather());
+      const frac = o ? clamp((now - o.startAt) / Math.max(1, o.endAt - o.startAt), 0, 1) : (now / 3600000) % 1;
+      drawClock(ctx, Math.floor(W * 0.68), 40, frac, now / 1000);
+      // 줄걸이: 집에 있으면 목줄(+모자)
+      const hx = R.hx, hy = R.hy;
       ctx.fillStyle = '#5e3e25'; ctx.fillRect(hx - 6, hy, 16, 3);
       ctx.fillStyle = '#d9b45a'; ctx.fillRect(hx - 2, hy + 3, 1, 3); ctx.fillRect(hx - 2, hy + 6, 3, 1); ctx.fillRect(hx + 5, hy + 3, 1, 3); ctx.fillRect(hx + 5, hy + 6, 3, 1);
-      const cx0 = Math.floor(LW * 0.72), fy = ROOM_H - 20;
-      ctx.fillStyle = '#2b211c'; ctx.fillRect(cx0 - 1, fy + 2, 34, 8);
-      ctx.fillStyle = '#7a2232'; ctx.fillRect(cx0, fy + 3, 32, 6);
-      ctx.fillStyle = '#96364a'; ctx.fillRect(cx0 + 3, fy + 4, 26, 3);
-      if (o) {
-        const tot = Math.max(1, o.endAt - o.startAt), frac = clamp((Date.now() - o.startAt) / tot, 0, 1);
-        drawClock(ctx, Math.floor(LW * 0.68), 40, frac, Date.now() / 1000);
+      if (!o) {
+        ctx.fillStyle = '#3a2a20'; ctx.fillRect(hx - 2, hy + 6, 1, 16); ctx.fillRect(hx, hy + 7, 1, 15); ctx.fillRect(hx - 2, hy + 22, 3, 1);
+        ctx.fillStyle = '#d9b45a'; ctx.fillRect(hx - 1, hy + 23, 1, 2);
+        const hat = st.equipped.hat && S.hatAlone(st.equipped.hat);
+        if (hat) ctx.drawImage(hat, hx + 5 - 13, hy + 3);
+      }
+      // 강아지 깔개
+      const m0 = R.mat;
+      ctx.fillStyle = '#2b211c'; ctx.fillRect(m0 - 1, fy + 2, 34, 8);
+      ctx.fillStyle = '#7a2232'; ctx.fillRect(m0, fy + 3, 32, 6);
+      ctx.fillStyle = '#96364a'; ctx.fillRect(m0 + 3, fy + 4, 26, 3);
+      // 창가 의자 + 신사(신문 4초 주기로 넘김)
+      const X = R.sx - 12, Y = lay(H).yF - 50;
+      ctx.drawImage(S.prop('chair'), X + 5 - 1, Y + 27 - 1);
+      if (o) ctx.drawImage(S.prop('paperfold'), X + 7, Y + 36);
+      else {
+        drawGent(ctx, H, st.equipped, R.sx, 8, { noHat: true });
+        const pp = S.prop(t % 4 > 3.4 ? 'paper1' : 'paper0');
+        ctx.drawImage(pp, X + 14, Y + 20 + 15 - pp.height);
+      }
+      // 강아지: 잠(숨쉬기) · 가끔 기지개 · 쓰다듬으면 일어나 꼬리
+      if (!o) {
+        const dx = R.dogX, cyc = t % 16;
+        let stand = null;
+        if (this.dogWake > 0) stand = Math.floor(t / 0.18) % 2 ? 'w2' : 'w0';
+        else if (cyc > 12.5 && cyc < 13.5) stand = 'sniff';
+        else if (cyc >= 13.5 && cyc < 14.3) stand = 'w0';
+        if (stand) drawDog(ctx, H, st.dog.breed, dx, stand, st.equipped.dog, true);
+        else {
+          const d = S.dogSleep(st.dog.breed, Math.floor(t / 0.9) % 2, st.equipped.dog);
+          const x0 = dx - (d.w >> 1) - 1, y0 = lay(H).yF - d.h;
+          ctx.drawImage(flipCache(d), x0, y0);
+          const ph = (t % 2.4) / 2.4;
+          if (!REDUCED) {
+            ctx.globalAlpha = 1 - ph; ctx.fillStyle = '#5a554e';
+            const zx = x0 + 2 - Math.round(ph * 3), zy = y0 - 2 - Math.round(ph * 9);
+            ctx.fillRect(zx, zy, 3, 1); ctx.fillRect(zx + 1, zy + 1, 1, 1); ctx.fillRect(zx, zy + 2, 3, 1);
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+      this.fx.forEach((f) => {
+        if (f.kind !== 'heart' || f.t < 0) return;
+        ctx.globalAlpha = clamp(1.4 - f.t / f.life * 1.4, 0, 1);
+        ctx.drawImage(S.prop('heartfx'), Math.round(f.x + Math.sin(f.t * 6) * 1.5), Math.round(f.y - f.t * 16));
+        ctx.globalAlpha = 1;
+      });
+    },
+    /* 마당: 돌담 · 대문(오른쪽) · 화단 6칸 · 우편함 · 벤치. 대문 연출 중에만 신사와 강아지가 보임 */
+    drawYard(ctx, W) {
+      const H = ROOM_H, t = this.t, wth = houseWeather(), Y = YL(W), now = Date.now();
+      const cols = SKY[wth] || SKY.sunny;
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = cols[i]; ctx.fillRect(0, i * 23, W, 24); }
+      drawClouds(ctx, W, H, 0, t, wth === 'sunny' ? 'sunny' : 'cloudy');
+      // 담 너머 지붕들 · 나무
+      const r = rng(5);
+      for (let x = -4; x < W;) {
+        const w = 18 + Math.floor(r() * 14), h = 10 + Math.floor(r() * 16);
+        ctx.fillStyle = ['#d9b89a', '#cfa98a', '#e0c4a4'][Math.floor(r() * 3)]; ctx.fillRect(x, Y.wallY - h, w - 2, h + 2);
+        ctx.fillStyle = '#b8805f'; ctx.fillRect(x - 1, Y.wallY - h - 2, w, 2);
+        ctx.fillStyle = '#8a6a55'; if (h > 16) ctx.fillRect(x + 4, Y.wallY - h + 5, 3, 4);
+        x += w;
+      }
+      const tree = S.prop('tree');
+      [Math.floor(W * 0.3), Math.floor(W * 0.7)].forEach((x) => ctx.drawImage(tree, x - 15, Y.wallY + 8 - tree.height));
+      ctx.drawImage(S.stoneWall(W, 26), 0, Y.wallY);
+      // 풀밭 · 자갈길
+      ctx.fillStyle = '#93ab5a'; ctx.fillRect(0, Y.wallY + 26, W, H - Y.wallY - 26);
+      ctx.fillStyle = '#7c9a45';
+      for (let i = 0; i < 26; i++) ctx.fillRect((i * 37) % W, Y.wallY + 28 + ((i * 13) % 10), 2, 1);
+      ctx.fillStyle = '#d9c7a3'; ctx.fillRect(0, 151, W, 22);
+      ctx.fillStyle = '#b9a582'; ctx.fillRect(0, 151, W, 1); ctx.fillRect(0, 172, W, 1);
+      ctx.fillStyle = '#c4b08a'; for (let i = 0; i < 30; i++) ctx.fillRect((i * 29) % W, 153 + ((i * 7) % 18), 1, 1);
+      // 우리 집(왼쪽 끝): 벽 · 창 · 문
+      ctx.fillStyle = '#e3c99a'; ctx.fillRect(0, 14, 20, 158);
+      ctx.fillStyle = '#c4a877'; ctx.fillRect(19, 14, 1, 158);
+      ctx.fillStyle = '#9c4a2c'; ctx.fillRect(0, 10, 23, 4);
+      ctx.fillStyle = '#5f7a45'; ctx.fillRect(4, 42, 12, 20); ctx.fillStyle = '#4a6136'; for (let y = 43; y < 62; y += 3) ctx.fillRect(4, y, 12, 1);
+      ctx.fillStyle = '#f3ead6'; ctx.fillRect(2, 130, 16, 2);
+      ctx.fillStyle = '#4f6b4a'; ctx.fillRect(3, 132, 14, 39);
+      ctx.fillStyle = '#3d5639'; ctx.fillRect(9, 132, 1, 39); ctx.fillRect(5, 136, 3, 12); ctx.fillRect(11, 136, 3, 12);
+      ctx.fillStyle = '#d9b45a'; ctx.fillRect(14, 152, 1, 2);
+      ctx.fillStyle = '#b4a98f'; ctx.fillRect(0, 171, 22, 3);
+      // 화단 6칸 (싹 → 봉오리 → 개화, 핀 칸은 살랑)
+      const bx0 = Y.bed0 - 2, bw = Y.cw * PG.BEDS + 3;
+      ctx.fillStyle = '#5a3a22'; ctx.fillRect(bx0, Y.bedY - 1, bw, 8);
+      ctx.fillStyle = '#7a5232'; ctx.fillRect(bx0 + 1, Y.bedY, bw - 2, 5);
+      ctx.fillStyle = '#9a6a3e'; for (let i = 0; i < PG.BEDS; i++) ctx.fillRect(Y.bed0 + i * Y.cw + 3, Y.bedY + 2, 9, 1);
+      ctx.fillStyle = '#c9bfa6'; for (let i = 1; i < PG.BEDS; i++) ctx.fillRect(Y.bed0 + i * Y.cw - 1, Y.bedY, 1, 5);
+      (st.beds || []).forEach((b, i) => {
+        const stg = flowerStage(b, now), im = S.prop('fl' + stg);
+        const sway = stg === 2 && !REDUCED ? Math.round(Math.sin(t * 2.6 + i * 1.7)) : 0;
+        ctx.drawImage(im, Y.bed0 + i * Y.cw + 7 - (im.width >> 1) + sway, Y.bedY + 2 - im.height);
+      });
+      ctx.drawImage(S.prop('ybench'), Y.benchX, 137);
+      // 우편함: 안 읽은 우편이 있으면 깃발 올림 + 깜빡이는 배지
+      const un = unreadMail(), mb = S.prop(un ? 'mbox1' : 'mbox0');
+      ctx.drawImage(mb, Y.mbX, 150 - mb.height);
+      if (un && (REDUCED || Math.floor(t * 2) % 2 === 0)) {
+        ctx.fillStyle = '#2b211c'; ctx.fillRect(Y.mbX + 2, 150 - mb.height - 7, 6, 6);
+        ctx.fillStyle = '#c8452f'; ctx.fillRect(Y.mbX + 3, 150 - mb.height - 6, 4, 4);
+        ctx.fillStyle = '#fff3c4'; ctx.fillRect(Y.mbX + 4, 150 - mb.height - 5, 2, 1);
+      }
+      // 대문(왼 기둥 · 철문) → 인물 → 오른 기둥
+      const gp = S.prop('gpost'), gb = 172, leaf = S.prop(this.anim ? 'gleafo' : 'gleaf');
+      ctx.drawImage(gp, Y.gate0, gb - gp.height);
+      ctx.drawImage(leaf, Y.gate0 + 9, gb - 2 - leaf.height);
+      const a = this.anim;
+      if (a) {
+        const k = clamp(a.t / GATE_SEC, 0, 1), f = Math.floor(a.t / 0.13) % 4, dogF = 'w' + (Math.floor(a.t / 0.1) % 4);
+        if (a.kind === 'leave') {
+          const gx = Math.round(W * 0.2 + (W + 34 - W * 0.2) * k);
+          const d = drawDog(ctx, H, st.dog.breed, gx + 28, dogF, st.equipped.dog);
+          const g = drawGent(ctx, H, st.equipped, gx, f, { weather: wth });
+          drawLeash(ctx, [g.hand[0] + 1, g.hand[1] + 1], d.neck);
+        } else {
+          const gx = Math.round(W + 34 - (W + 34 - W * 0.45) * k);
+          const d = drawDog(ctx, H, st.dog.breed, gx - 28, dogF, st.equipped.dog, true);
+          const g = drawGentFlip(ctx, H, st.equipped, gx, f, { weather: wth });
+          drawLeash(ctx, [g.hand[0], g.hand[1] + 1], d.neck);
+        }
+      }
+      ctx.drawImage(gp, Y.gate0 + 25, gb - gp.height);
+      this.fx.forEach((f) => { if (f.kind === 'spark') ctx.drawImage(S.prop('spark'), f.x - 2, Math.round(f.y - f.t * 20)); });
+      if (wth === 'dusk') { ctx.fillStyle = 'rgba(90,60,90,0.12)'; ctx.fillRect(0, 0, W, H); }
+      if (wth === 'rain') {
+        ctx.fillStyle = 'rgba(60,70,90,0.12)'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = 'rgba(214,226,236,0.8)';
+        for (let i = 0; i < 44; i++) {
+          const x = ((((i * 41 - t * 30) % (W + 10)) + W + 10) % (W + 10)) - 5, y = ((i * 67 + t * 170) % (H + 10)) - 5;
+          ctx.fillRect(Math.round(x), Math.round(y), 1, 3);
+        }
       }
     },
   };
-  $('hShop').addEventListener('click', () => go('shop'));
-  $('hBook').addEventListener('click', () => go('endings', { back: 'home', tab: 'tre' }));
-  $('hDiary').addEventListener('click', () => go('endings', { back: 'home', tab: 'diary' }));
-  $('hGreet').addEventListener('click', () => go('replay'));
-  $('hAd').addEventListener('click', () => showAd(async () => {
+  $('hoSend').addEventListener('click', () => go('map'));
+  $('hoWard').addEventListener('click', () => { if (st.out) { toast('산책에서 돌아오면 갈아입을 수 있어요'); return; } go('wardrobe'); });
+  $('hoShop').addEventListener('click', () => go('shop', { back: 'house' }));
+  $('hoBook').addEventListener('click', () => go('endings', { back: 'house' }));
+  $('hoGreet').addEventListener('click', () => scenes.house.greet());
+  $('hoAd').addEventListener('click', () => showAd(async () => {
     if (!st.out) return;
     st.out.endAt = Date.now(); await save(); toast(josa(st.dog.name, '이/가') + ' 서둘러 돌아오고 있어요');
   }));
+  $('mlClose').addEventListener('click', () => scenes.house.closeMail());
+  document.querySelectorAll('#hoDots button').forEach((b) => b.addEventListener('click', () => scenes.house.setView(b.dataset.v)));
+  DEBUG.house = scenes.house;
 
   /* ---------- 10. 귀가 리플레이 ---------- */
   const REPLAY_SPEED = 2.5;
   scenes.replay = {
     enter() {
-      if (!st.out) { go('wardrobe'); return; }
+      if (!st.out) { go('house'); return; }
       inp.down = false;
       this.w = makeWalk({ out: st.out }); scenes.walk.w = this.w;
       hidePrompt(); $('dlg').hidden = true;
@@ -1718,7 +2062,7 @@
   /* ---------- 7. 엔딩 씬 ---------- */
   scenes.ending = {
     enter(arg) {
-      this.e = END[arg.id]; this.then = arg.then || 'wardrobe'; this.replay = !!arg.replay;
+      this.e = END[arg.id]; this.then = arg.then || 'house'; this.replay = !!arg.replay;
       this.li = 0; this.ci = 0; this.t = 0; this.finished = false;
       $('eTitle').textContent = '— ' + this.e.title + ' —';
       $('eArt').src = S.toURL(endingArt(this.e.id), 3);
@@ -1776,6 +2120,26 @@
   };
   window.addEventListener('pointerup', pointerEnd);
   window.addEventListener('pointercancel', pointerEnd);
+  // 집: 무대 위 좌우 스와이프 = 실내 ↔ 마당, 짧은 탭 = 강아지 쓰다듬기 · 꽃 따기 · 우편함
+  const hin = { down: false, id: null, x0: 0, y0: 0, t0: 0 };
+  function toLogical(px, py) {
+    const r = cv.getBoundingClientRect();
+    return [((px - r.left) * cv.width / r.width - OX) / SC, ((py - r.top) * cv.height / r.height - OY) / SC];
+  }
+  DEBUG.toScreen = (x, y) => { const r = cv.getBoundingClientRect(); return [r.left + (x * SC + OX) * r.width / cv.width, r.top + (y * SC + OY) * r.height / cv.height]; };
+  cv.addEventListener('pointerdown', (e) => {
+    if (sceneName !== 'house') return;
+    Object.assign(hin, { down: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now() });
+  });
+  window.addEventListener('pointerup', (e) => {
+    if (!hin.down || e.pointerId !== hin.id) return;
+    hin.down = false;
+    if (sceneName !== 'house') return;
+    const dx = e.clientX - hin.x0, dy = e.clientY - hin.y0;
+    if (Math.abs(dx) >= 30 && Math.abs(dx) > Math.abs(dy) * 1.2) scenes.house.setView(dx < 0 ? 'yard' : 'room');
+    else if (Math.hypot(dx, dy) < 12 && performance.now() - hin.t0 < 600) { const p = toLogical(e.clientX, e.clientY); scenes.house.tap(p[0], p[1]); }
+  });
+  window.addEventListener('pointercancel', () => { hin.down = false; });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
 
@@ -1801,6 +2165,7 @@
     window.addEventListener('resize', resize);
     $('hudCoinImg').src = S.iconURL('coinicon');
     $('bookImg').src = S.iconURL('book');
+    $('hudFlwImg').src = S.iconURL('fl2');
     st = PG.migrate(await PG.repo.load());
     route();
     window.addEventListener('hashchange', route);
@@ -1816,22 +2181,25 @@
     else if (h === 'wardrobe') go('wardrobe');
     else if (h === 'walk') go('walk');
     else if (h === 'map') go('map');
-    else if (h === 'home') { if (!st.out) { st.out = makeOut('piazza', false, false); await save(); } go('home'); }
+    else if (h === 'house' || h === 'home') {   // 예전 대기 화면(#home)은 집으로 통합
+      if (h === 'home') { try { history.replaceState(null, '', '#house'); } catch (e) { /* file:// 등 */ } }
+      go('house');
+    }
     else if (h === 'replay') { if (!st.out) { st.out = makeOut('piazza', false, false); st.out.endAt = Date.now(); await save(); } go('replay'); }
     else if (h === 'dig') {
       if (st.lastWalk && st.lastWalk.dig && !st.lastWalk.dig.done) go('dig'); else simulateOuting(false);
     }
     else if (h === 'shop') go('shop');
-    else if (h === 'endings') go('endings', { back: 'wardrobe' });
+    else if (h === 'endings') go('endings', { back: 'house' });
     else if (h.indexOf('ending-') === 0 && END[h.slice(7)]) go('ending', { id: h.slice(7), then: 'endings', replay: true });
     else if (h === 'result') {
       if (!st.lastWalk) simulateOuting(true);
       else go('result');
     } else if (!st) go('dog');
-    else if (st.out) go('home');
+    else if (st.out) go('house');
     else if (st.lastWalk && st.lastWalk.dig && !st.lastWalk.dig.done) go('dig');
     else if (st.pendingEnding && st.lastWalk) go('result');
-    else go('wardrobe');
+    else go('house');
   }
   boot();
 })();

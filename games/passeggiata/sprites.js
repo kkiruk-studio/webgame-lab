@@ -102,7 +102,7 @@
     SIT: ['....BBBBBBB.....', '....LLLLLLLLLLL.', '....LLLLLLLLLLL.', '....lllllllllLL.']
       .concat(rep('............LLL.', 8), ['............FFFF', '............qqqq']),
   };
-  /* 프레임: 0~3 걷기, 4 서기, 5 숨쉬기, 6 앉기, 7 인사(팔 올림) */
+  /* 프레임: 0~3 걷기, 4 서기, 5 숨쉬기, 6 앉기, 7 인사(팔 올림), 8 앉아서 신문 읽기(팔 앞으로) */
   const GF = [
     { legs: 'A', ly: 29, bob: 0, near: 'BACK', far: 'FWD' },
     { legs: 'B', ly: 28, bob: -1, near: 'STR', far: 'STR' },
@@ -112,7 +112,10 @@
     { legs: 'STAND', ly: 29, bob: -1, near: 'STR', far: 'STR', hipFill: true },
     { legs: 'SIT', ly: 37, bob: 8, near: 'STR', far: 'STR' },
     { legs: 'STAND', ly: 29, bob: 0, near: 'UP', far: 'STR' },
+    { legs: 'SIT', ly: 37, bob: 8, near: 'FWD', far: 'FWD' },
   ];
+  const SITTING = (f) => f === 6 || f === 8;
+  S.SITTING = SITTING;
   S.GFRAMES = GF.length;
   const GW = 24, GH = 52;
 
@@ -197,19 +200,19 @@
           if (y >= skirt0 && y < skirt1) {
             if (ch === 'l') return p.a;
             if (ch === 'L' || ch === 'B') return p.T;
-            if (xx >= 8 && xx <= 14 && f !== 6) return p.T;
+            if (xx >= 8 && xx <= 14 && !SITTING(f)) return p.T;
           }
           return null;
         });
       }
       case 'hat': {
-        if (f === 6) return null;
+        if (SITTING(f)) return null;
         const rows = HAT_SHAPE[it.shape], c = mk(GW, GH);
         paint(c.getContext('2d'), rows, p, 7, 5 + b - (rows.length - 1));
         return c;
       }
       case 'acc': {
-        if (f === 6 || f === 7) return null;
+        if (SITTING(f) || f === 7) return null;
         const h = HAND[f], c = mk(GW, GH), x = c.getContext('2d');
         const sx = h[0] + 2;
         if (it.shape === 'cane') {
@@ -360,6 +363,29 @@
     return r;
   };
 
+  /* 잠(엎드림) 2프레임: f=0 내쉼, f=1 들숨(등이 1px 올라옴). 다리는 몸 아래로 숨기고 처진 귀 머리를 내려놓음 */
+  const SCACHE = new Map();
+  S.dogSleep = function (breed, f, itemId) {
+    const key = breed + '|' + f + '|' + (itemId || '');
+    let r = SCACHE.get(key);
+    if (r) return r;
+    const D = DOGS[breed];
+    const c = mk(D.w, D.h + 2), x = c.getContext('2d');
+    const by = D.h - D.body.rows.length, drop = by - D.body.y;
+    if (f) paint(x, D.body.rows, D.pal, D.body.x, by - 1);
+    paint(x, D.body.rows, D.pal, D.body.x, by);
+    paint(x, D.sulk.rows, D.pal, D.sulk.x + 1, D.sulk.y + drop + 1);
+    const it = itemId && ITEMS[itemId];
+    if (it) {
+      const nx = D.neck[0] + 1, ny = D.neck[1] + drop + 1, p = it.pal;
+      if (it.shape === 'collar') { x.fillStyle = p.c; x.fillRect(nx - 1, ny - 1, 2, 3); x.fillStyle = p.y; x.fillRect(nx, ny + 2, 1, 1); }
+      else { x.fillStyle = p.c; x.fillRect(nx - 2, ny, 4, 1); x.fillRect(nx - 1, ny + 1, 3, 1); x.fillStyle = p.C; x.fillRect(nx - 2, ny, 1, 1); }
+    }
+    r = { c: outline(c), w: D.w, h: D.h, head: [D.sulk.x + 3, D.sulk.y + drop + 1] };
+    SCACHE.set(key, r);
+    return r;
+  };
+
   /* ================= 이웃 (정면, idle 2프레임) ================= */
   const NBR = {
     marta: {
@@ -467,6 +493,43 @@
     mound: { pal: { l: '#9a6a3e', d: '#7a5232', D: '#5a3a22' }, rows: ['.....llll.....', '...lldddll....', '..lddddddDl...', '.ldddDdddddl..',
       'ldddddddDdddl.', 'DDDDDDDDDDDDDD'] },
     book: { pal: { r: '#7a2232', R: '#5a1824', w: '#f6efdf', y: '#d9b45a' }, rows: ['rrrrrrrr.', 'rRyyyyRrw', 'rRyRRyRrw', 'rRRRRRRrw', 'rRRRRRRrw', 'rRRyyRRrw', 'rRRRRRRrw', 'rrrrrrrrw', '.wwwwwwww'] },
+    /* ---- 집 · 마당 ---- */
+    /* 신문(펼쳐 든 모습) 2프레임: 0 읽기, 1 넘기기(오른쪽 장이 들림) */
+    paper0: { pal: { w: '#efe9da', l: '#9a948a', L: '#5a554e', f: '#c9c1ad' },
+      rows: ['wwwwwfwwwww', 'wLLLwfwLLLw', 'wwwwwfwwwww', 'wllwwfwllww', 'wwwwwfwwwww', 'wlllwfwlllw', 'wwwwwfwwwww',
+        'wllwwfwlllw', 'wwwwwfwwwww', 'wlllwfwllww', 'wwwwwfwwwww', 'wllwwfwlllw', 'wwwwwfwwwww'] },
+    paper1: { pal: { w: '#efe9da', l: '#9a948a', L: '#5a554e', f: '#c9c1ad' },
+      rows: ['......wwww.', 'wwwwwfwwww.', 'wLLLwfwLLw.', 'wwwwwfwwww.', 'wllwwfwlww.', 'wwwwwfwwww.', 'wlllwfwlll.',
+        'wwwwwfwww..', 'wllwwfwll..', 'wwwwwfww...', 'wlllwfww...', 'wwwwwf.....', 'wllwwf.....', 'wwwwwf.....'] },
+    paperfold: { pal: { w: '#efe9da', l: '#9a948a', f: '#c9c1ad' }, rows: ['wwwwwwwww', 'wlllwllww', 'fffffffff'] },
+    /* 파란 꽃 3단계: 싹 → 봉오리 → 개화 */
+    fl0: { pal: { g: '#7c9a45', G: '#566e2e' }, rows: ['g...g', '.g.g.', '..G..', '..G..'] },
+    fl1: { pal: { b: '#5f8fc4', B: '#2f5a99', g: '#7c9a45', G: '#566e2e' },
+      rows: ['..b..', '.bBb.', '.bBb.', '..G..', 'g.G.g', '.gGg.', '..G..', '..G..'] },
+    fl2: { pal: { b: '#5f8fc4', B: '#2f5a99', w: '#cfe0f2', y: '#e8c24a', g: '#7c9a45', G: '#566e2e' },
+      rows: ['..b.b..', '.bwbwb.', 'bbByBbb', '.bwbwb.', '..b.b..', '...G...', 'g..G..g', '.g.G.g.', '..gGg..', '...G...', '...G...'] },
+    /* 우편함(깃발 내림/올림) */
+    mbox0: { pal: { r: '#b8592f', R: '#94451f', k: '#2b211c', p: '#5a3a22', w: '#efe2c4', F: '#c8452f' },
+      rows: ['.rrrrrrr...', 'rRRRRRRRr..', 'rRwwwwwRr..', 'rRRRRRRRr..', 'rRRRRRRRrFF', 'rRRRRRRRr..', 'rrrrrrrrr..',
+        '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....',
+        '....pp.....', '....pp.....', '....pp.....', '...pppp....'] },
+    mbox1: { pal: { r: '#b8592f', R: '#94451f', k: '#2b211c', p: '#5a3a22', w: '#efe2c4', F: '#c8452f' },
+      rows: ['.........FF', '.rrrrrrr.FF', 'rRRRRRRRrF.', 'rRwwwwwRrF.', 'rRRRRRRRrF.', 'rRRRRRRRr..', 'rRRRRRRRr..', 'rrrrrrrrr..',
+        '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....', '....pp.....',
+        '....pp.....', '....pp.....', '....pp.....', '...pppp....'] },
+    /* 작은 정원 벤치(정면) */
+    ybench: { pal: { b: '#8a5a36', B: '#6b4227', k: '#2f3333' },
+      rows: ['bbbbbbbbbbbbbbbbbb', 'BBBBBBBBBBBBBBBBBB', '.k..............k.', 'bbbbbbbbbbbbbbbbbb', 'BBBBBBBBBBBBBBBBBB',
+        '.k..............k.', '.k..............k.', '.k..............k.'] },
+    /* 대문: 돌기둥 · 철문(닫힘 / 열림=안쪽으로 접혀 좁아짐) */
+    gpost: { pal: { s: '#c9bfa6', S: '#a69b80', c: '#e3dbc6', k: '#8a7f68' },
+      rows: ['.cccccc.', 'cccccccc', 'SSSSSSSS'].concat(Array(38).fill('.sSssSs.').map((r, i) => (i % 6 === 5 ? '.kkkkkk.' : r)), ['SSSSSSSS']) },
+    gleaf: { pal: { i: '#2f3333', y: '#d9b45a' },
+      rows: ['iiiiiiiiiiiiiiii', 'i.i.i.iyyi.i.i.i', 'i.i.i.i..i.i.i.i'].concat(Array(22).fill('i.i.i.i..i.i.i.i'), ['iiiiiiiiiiiiiiii',
+        'i.i.i.i..i.i.i.i', 'i.i.i.i..i.i.i.i', 'iiiiiiiiiiiiiiii']) },
+    gleafo: { pal: { i: '#2f3333' }, rows: ['ii', 'ii'].concat(Array(25).fill('ii'), ['ii', 'ii']) },
+    /* 쓰다듬기 하트 이펙트 */
+    heartfx: { pal: { r: '#e0607a', R: '#b8405a', w: '#ffe6ec' }, rows: ['.r.r.', 'rwrrr', 'rrrrR', '.rrR.', '..R..'] },
   };
   const PROPS = {};
   function bakeProps() {
@@ -479,6 +542,7 @@
     PROPS.lamp = makeLamp();
     PROPS.door = makeDoor();
     PROPS.bench = makeBench();
+    PROPS.chair = makeChair();
   }
   S.prop = (k) => PROPS[k];
 
@@ -528,6 +592,39 @@
     x.fillStyle = '#2f3333'; x.fillRect(1, 16, 1, 9); x.fillRect(9, 16, 1, 9); x.fillRect(0, 24, 3, 1); x.fillRect(8, 24, 3, 1);
     return outline(c);
   }
+
+  /* 창가 안락의자(옆모습, 등받이 왼쪽) — 벤치와 같은 기준점(앉은 프레임 엉덩이가 좌석 위) */
+  function makeChair() {
+    const c = mk(15, 25), x = c.getContext('2d');
+    x.fillStyle = '#5a3a22'; x.fillRect(0, 0, 4, 16); x.fillRect(0, 13, 14, 4);
+    x.fillStyle = '#7a2232'; x.fillRect(1, 1, 2, 13); x.fillRect(2, 13, 11, 2);
+    x.fillStyle = '#96364a'; x.fillRect(1, 1, 1, 12); x.fillRect(3, 13, 9, 1);
+    x.fillStyle = '#74502c'; x.fillRect(4, 9, 9, 2); x.fillRect(12, 9, 2, 4);
+    x.fillStyle = '#4a3020'; x.fillRect(1, 17, 2, 8); x.fillRect(11, 17, 2, 8);
+    return outline(c);
+  }
+  /* 낮은 돌담 타일(가로 반복), 높이 h */
+  const WCACHE = {};
+  S.stoneWall = function (w, h) {
+    const k = w + 'x' + h;
+    if (WCACHE[k]) return WCACHE[k];
+    const c = mk(w, h), x = c.getContext('2d'), r = rng(311);
+    x.fillStyle = '#a69b80'; x.fillRect(0, 0, w, h);
+    for (let row = 0, y = 3; y < h; row++, y += 5) {
+      let sx = row % 2 ? -4 : 0;
+      while (sx < w) {
+        const sw = 6 + Math.floor(r() * 5);
+        x.fillStyle = ['#c9bfa6', '#bdb196', '#d4cab2'][Math.floor(r() * 3)];
+        x.fillRect(sx + 1, y + 1, sw - 1, 4);
+        x.fillStyle = '#e3dbc6'; x.fillRect(sx + 1, y + 1, sw - 2, 1);
+        sx += sw;
+      }
+    }
+    x.fillStyle = '#e3dbc6'; x.fillRect(0, 0, w, 2);
+    x.fillStyle = '#8a7f68'; x.fillRect(0, 2, w, 1); x.fillRect(0, h - 1, w, 1);
+    WCACHE[k] = c;
+    return c;
+  };
 
   /* ================= 건물 파사드 (타일 조합, 시드별 캐시) ================= */
   const WIN_OPEN = ['..ffffffff..', 'ssfddddddfss', 'SSfdLddddfSS', 'ssfdLddddfss', 'SSfddddddfSS', 'ssffffffffss',

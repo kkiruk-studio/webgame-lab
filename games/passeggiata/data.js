@@ -175,6 +175,61 @@
       trait: '소피아 확정 · 냄새 자리 3', perk: '강아지 기분 ↑' },
   ];
   PG.SNACK_COST = 5;
+  PG.SNACK_FLOWERS = 2;     // 간식은 꽃 2 또는 코인 5 (꽃이 있으면 꽃 우선)
+  PG.GIFT_FLOWERS = 3;      // 꽃 선물: 그 산책의 첫 이웃 인사 호감 +1
+
+  /* ---------- 집 마당: 파란 꽃 화단 ---------- */
+  /* 개화까지 걸리는 시간(초). PG.TIMER_SCALE 이 곱해진다.
+     프로토 90초. 실서비스는 2~4시간(7200~14400) 정도로 올릴 것. */
+  PG.FLOWER_SEC = 90;
+  PG.BEDS = 6;
+  PG.flowerMs = function () { return PG.FLOWER_SEC * PG.TIMER_SCALE * 1000; };
+  /* 새 화단: 앞 3칸은 바로 개화(첫 터치 보상), 나머지는 봉오리·싹·막 심음 */
+  PG.initBeds = function (now) {
+    const g = PG.flowerMs(), ages = [1, 1, 1, 0.6, 0.3, 0];
+    return ages.map((a) => ({ plantedAt: now - Math.round(g * a) }));
+  };
+
+  /* 이웃 편지: 호감 level 에 처음 닿은 뒤 돌아올 때 우편함으로 한 통씩(귀가 1회당 최대 1통).
+     하트 이벤트(HEART_EVENTS) 대사와 겹치지 않는 내용. */
+  PG.LETTERS = [
+    { id: 'l_marta1', who: 'marta', level: 1, lines: [
+      '시뇨레, 오늘 아침 수국 줄기를 비스듬히 잘라 두었어요.',
+      '그래야 물을 잘 먹는대요. 저도 처음엔 몰랐답니다.',
+      '산책길에 시들한 꽃이 보이면 언제든 들고 오세요. — 마르타'] },
+    { id: 'l_marta3', who: 'marta', level: 3, lines: [
+      '파란 꽃은 다른 꽃보다 물을 자주 갈아 줘야 해요.',
+      '예전에 그분이 저한테 가르쳐 주신 거예요. 웃으시면서요.',
+      '이젠 제가 시뇨레께 알려 드릴 차례인가 봐요. — 마르타'] },
+    { id: 'l_marta5', who: 'marta', level: 5, lines: [
+      '떨어진 꽃잎은 버리지 않고 말려서 책갈피로 써요.',
+      '그분이 늘 그렇게 하셨거든요. 가게 서랍에 아직 몇 장 남아 있어요.',
+      '한 장 같이 넣어 보내요. 물론 파란색이에요. — 마르타'] },
+    { id: 'l_enzo1', who: 'enzo', level: 1, lines: [
+      '시뇨레, 이번 주 원두는 에티오피아산이에요. 꽃 향이 나요.',
+      '아침 일곱 시에 볶으면 골목 끝까지 냄새가 가더라고요.',
+      '산책길에 냄새를 따라 들르세요. — 엔조'] },
+    { id: 'l_enzo3', who: 'enzo', level: 3, lines: [
+      '찬장에 같은 무늬 잔이 두 개 있어요. 하나는 이가 조금 나갔죠.',
+      '버리려다 말았어요. 둘이 한 짝이라서요.',
+      '이 나간 쪽은 제가 쓸게요. 온전한 쪽은 시뇨레 몫이에요. — 엔조'] },
+    { id: 'l_enzo5', who: 'enzo', level: 5, lines: [
+      '오늘 처음으로 제 손으로 원두를 블렌딩해 봤어요.',
+      '부드럽고, 끝맛이 조금 달아요. 이름은 아직 없어요.',
+      '이름은 시뇨레가 지어 주세요. 두 잔 분량으로 포장해 둘게요. — 엔조'] },
+    { id: 'l_sofia1', who: 'sofia', level: 1, lines: [
+      '{dog} 그림이에요. 제가 그렸어요!',
+      '다리가 좀 길게 됐지만 그래도 {dog} 맞아요.',
+      '할아버지 냉장고에 꼭 붙여 주세요! — 소피아'] },
+    { id: 'l_sofia3', who: 'sofia', level: 3, lines: [
+      '이번엔 할아버지랑 {dog} 둘 다 그렸어요. 제가 그렸어요.',
+      '갈색 크레파스가 다 닳아서 모자는 까만색이 됐어요.',
+      '다음엔 꼭 갈색으로 다시 그려 드릴게요. — 소피아'] },
+    { id: 'l_sofia5', who: 'sofia', level: 5, lines: [
+      '선생님이 제일 좋아하는 길을 그리래서 이 골목을 그렸어요.',
+      '할아버지, {dog}, 그리고 길가의 파란 꽃까지요. 제가 그렸어요.',
+      '칭찬 스티커도 받았어요! 반 나눠 드릴게요. — 소피아'] },
+  ];
 
   /* 보물. value = 중복일 때 코인 환산 기준(×2). frag = 파내면 해금되는 일기 조각.
      이야기와 이어지는 보물은 희귀도 3. 아이콘은 sprites.js TREASURE_DEF 의 같은 id. */
@@ -265,7 +320,7 @@
 
   PG.newSave = function (breed, name) {
     return {
-      v: 4,
+      v: 5,
       dog: { breed: breed, name: name },
       day: 1,
       coins: 30,
@@ -289,6 +344,11 @@
       eveningDay: 0,        // 저녁 산책을 한 day
       out: null,            // 보내기 진행 중 {dest, snack, seed, startAt, endAt, weather, day, evening}
       treasures: {},        // 보물 id -> 개수
+      flowers: 0,           // 마당에서 딴 파란 꽃
+      beds: PG.initBeds(Date.now()),   // 화단 6칸 {plantedAt}
+      mail: [],             // 우편함 {id, kind:'photo'|'letter', at, day, read, ...}
+      petLog: [],           // 쓰다듬기 타임스탬프(1분 3회 제한)
+      lettersSent: [],      // 보낸 이웃 편지 id
     };
   };
 
@@ -310,7 +370,12 @@
     if (!s.treasures || typeof s.treasures !== 'object' || Array.isArray(s.treasures)) s.treasures = {};
     const o = s.out;
     if (o && (typeof o !== 'object' || !PG.DESTS.some((d) => d.id === o.dest) || typeof o.endAt !== 'number')) s.out = null;
-    s.v = 4;
+    /* v5: 집 마당 · 우편함 */
+    if (typeof s.flowers !== 'number' || isNaN(s.flowers) || s.flowers < 0) s.flowers = 0;
+    if (!Array.isArray(s.beds) || s.beds.length !== PG.BEDS || s.beds.some((b) => !b || typeof b.plantedAt !== 'number' || isNaN(b.plantedAt))) s.beds = PG.initBeds(Date.now());
+    ['mail', 'petLog', 'lettersSent'].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
+    s.mail = s.mail.filter((m) => m && typeof m === 'object' && (m.kind === 'photo' || m.kind === 'letter'));
+    s.v = 5;
     return s;
   };
 
