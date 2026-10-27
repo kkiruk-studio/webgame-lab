@@ -13,6 +13,7 @@
 - 사용자는 핸드폰 데이터망에서 사파리로 확인하므로 로컬 서버는 의미가 없다.
 - 푸시 후 30초~2분 뒤 `curl -s -o /dev/null -w '%{http_code}' <URL>` 로 200을 확인하고 URL을 사용자에게 준다.
 - URL 패턴: `https://kkiruk-studio.github.io/webgame-lab/games/<slug>/`
+- 로컬 js/css 는 `?v=0` 식 버전 쿼리를 붙여 두면 deploy.sh 가 타임스탬프로 바꿔 캐시 섞임을 막는다(Pages max-age 600). 새 게임도 같은 형식으로.
 
 ## 새 게임 추가 절차
 1. `games/<slug>/index.html` 생성
